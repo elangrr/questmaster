@@ -279,6 +279,7 @@ r/questmaster/            realm: storage, coins, public functions, events, pages
 scripts/local-flow.sh     full flow on a local node
 scripts/set-namespace.sh  replace the placeholder namespace before deploying
 docs/                     plan, deployment steps, demo script, Gno notes
+LICENSE, NOTICE            Apache License 2.0 for QuestMaster's own code; third-party notice
 ```
 
 Events on every change, for indexers: `QuestPosted`, `QuestClaimed`, `QuestUnclaimed`, `QuestReleased`, `WorkSubmitted`, `WorkRejected`, `QuestPaid` (with `how` = approved or timeout), `QuestClosing`, `QuestCancelled` (with `how` = open, unclaimed, released or rejected).
@@ -292,13 +293,14 @@ Events on every change, for indexers: `QuestPosted`, `QuestClaimed`, `QuestUncla
 
 ## Licence and credits
 
-QuestMaster is free software under the **GNO Network General Public License, version 6** (or any later version). Copyright (C) 2026 Fluxen. The licence text in `LICENSE` is copied verbatim from `LICENSE.md` in github.com/gnolang/gno at tag v1.8.0.
+QuestMaster's own code is licensed under the **Apache License, Version 2.0** (see `LICENSE` and `NOTICE`). Copyright 2026 Fluxen. That licence covers only the code written for QuestMaster in this repository.
 
-It uses three packages from github.com/gnolang/gno, which are under the same licence:
+QuestMaster imports these packages on chain. They are not copied into this repository; they come from github.com/gnolang/gno and stay under their own licence, the GNO Network General Public License, version 6, including its attribution terms. QuestMaster's licence does not relicense them.
 
 - `gno.land/p/nt/avl/v0`: the sorted tree that stores quests.
 - `gno.land/p/moul/txlink/v0`: builds the gnoweb transaction links.
 - `gno.land/p/nt/markdown/sanitize/v0`: escapes user text for Markdown.
+- The Gno standard library (`chain`, `chain/banker`, `chain/runtime`, `strings` and others).
 
 Built on [gno.land](https://gno.land).
 

@@ -202,8 +202,13 @@ Other facts:
   attribution link to "a URL designated by the Licensor", with up to three words such as "built on". No URL is named
   in the repo at v1.8.0; we use https://gno.land as our best reading. The licence text has no "Everyone is permitted
   to copy and distribute verbatim copies" sentence, but its section "How to Apply These Terms to Your New Programs"
-  invites other authors to license their programs under it; our LICENSE follows that section. This is our reading,
-  not legal advice.
+  invites other authors to license their programs under it. This is our reading, not legal advice, kept as
+  background.
+- **Licence decision (2026-11-23):** the owner, as copyright holder, chose the Apache License 2.0 for QuestMaster's
+  own code (`LICENSE`, `NOTICE`). It covers only the code in this repository. The imported packages above and the
+  Gno standard library stay under the GNO Network General Public License v6 and its attribution terms; NOTICE and
+  the README say so, and the pages keep "Built on gno.land". Before this, from task 4 until this change, the repo's
+  LICENSE was the GNO Network GPL v6.
 
 ## Hardening after the security review (task 5)
 
