@@ -147,3 +147,59 @@ throwaway folder.
 transactions go through the same `Deliver` path as normal ones (bank, storage deposit, revert on error)
 but need no signature, only the caller's public key, so no key is created or used. Each stage reboots
 with the transactions so far and reads balances, totals, storage and pages.
+
+## Onyx facts (read-only queries, 2026-11-23, height about 1,344,400)
+
+All queries are ABCI queries to `https://rpc.onyx.testnets.gno.land:443` (`/abci_query?path="<path>"&data=0x<hex>`);
+`gnokey query <path> -data "<data>" -remote https://rpc.onyx.testnets.gno.land:443` gives the same.
+
+| Query | Result | Meaning |
+|---|---|---|
+| `auth/gasprice` | `{"gas":"1000","price":"1ugnot"}` | Current minimum gas price: 1 ugnot per 1,000 gas. A fee must be at least `gas-wanted / 1000` ugnot. The price is dynamic (`params/auth:p:target_gas_ratio` = 70) and can rise when blocks are full. |
+| `params/auth:p:initial_gasprice` | `{"gas":"1000","price":"1ugnot"}` | Same as the current price. |
+| `params/vm:p:storage_price` | `"100ugnot"` | Storage deposit: 100 ugnot per byte. |
+| `params/vm:p:default_deposit` | `"100000000ugnot"` | Deposit cap per message when `-max-deposit` is not given: 100 GNOT. |
+| `params/bank:p:restricted_denoms` | `[]` | ugnot is not restricted, so a freed deposit goes back to the caller who freed it (not to the storage fee collector `g1c9stkafpvcwez2efq3qtfuezw4zpaux3tvxggk`). |
+| `params/vm:p:code_submission_policy` | `"inert"` | **A new package is parked until a package approver enables it.** |
+| `params/vm:p:pkg_approvers` | 7 addresses, first `g1yaee4f2qt8yyzse54wq7r897ndupnvxcyl6adz` (gpao, the approvals oracle) | gpao (`contribs/gpao`) watches new `addpkg` transactions, typechecks and preprocesses each package within a time budget, and if it passes sends `MsgEnablePackage`. Imports are resolved from the chain, so `p/escrow` must be live before `r/questmaster` is submitted. |
+| `params/vm:p:inert_submission_charge` | `""` | No charge for submitting. |
+| `params/vm:p:run_submitters` | one address | `gnokey maketx run` is closed to everyone else; QuestMaster only needs `maketx call`. |
+| `params/vm:p:syscla_pkgpath` + `vm/qrender` `gno.land/r/sys/cla:` | "CLA enforcement is currently DISABLED. All package deployments are allowed." | No CLA to sign today. |
+| `vm/qeval` `gno.land/r/sys/names.IsEnabled()` | `true` | Namespace check is on. |
+| `vm/qeval` `gno.land/r/sys/names.IsAuthorizedAddressForNamespace(address("g1jg8m…sqf5"), "g1jg8m…sqf5")` | `true` | An address may deploy under its own address namespace. |
+| same with namespace `"questmaster_dev"` | `false` | The placeholder cannot be deployed as is. |
+| `vm/qrender` `gno.land/r/sys/namereg/v0:` | names must be `nym-<5 to 13 lowercase letters><3 digits>`, 12 to 20 characters, stem not starting with gno, gl, atom, atone, photon, cosmos, no reserved role names; "Registration price: 0.000000 GNOT (0ugnot)"; register via `Register` on `r/sys/namereg/v0` | A free name such as `nym-fluxen123` gives `gno.land/{p,r}/nym-fluxen123/*`. |
+| `vm/qfile` `gno.land/p/nt/avl/v0`, `gno.land/p/moul/txlink/v0`, `gno.land/p/nt/markdown/sanitize/v0` | file lists returned | All three dependencies are live on Onyx at the paths we import. |
+| `vm/qinertpaths` | 68 parked packages, among them recent ones | Approval is not instant and not guaranteed. |
+| `vm/qpkgmeta_json` `<path>` | e.g. `{"status":"inert",...,"reason":"waiting for a package approver to enable it","pending":true}` or `{"status":"live",...}` | How to check whether a submitted package is live yet. |
+| `auth/accounts/g1yaee4f…` (gpao) | sequence 1190 at heights 1,344,383 and 1,344,441 | gpao has sent about 1,190 approvals in total; no new one in that 5-minute window, while a small package submitted at height 1,343,990 was still parked. Deploy early and check. |
+
+Other facts:
+
+- gnoweb for Onyx: `https://onyx.testnets.gno.land` (its pages carry `<meta name="gnoconnect:chainid" content="onyx-1">`). A realm is at
+  `https://onyx.testnets.gno.land/r/<namespace>/questmaster`, a page at `…/questmaster:quest/1`.
+- Explorer: GnoScan (`https://gnoscan.io`) lists Onyx (`chainId: "onyx-1"`, RPC `https://rpc.onyx.testnets.gno.land:443`) in its
+  network list. From its front-end routes (read from the site's JavaScript, not documented): realm
+  `https://gnoscan.io/realms/details?path=gno.land/r/<namespace>/questmaster&chainId=onyx-1`, transaction
+  `https://gnoscan.io/transactions/details?txhash=<hash>&chainId=onyx-1`, account
+  `https://gnoscan.io/account/<g1address>?chainId=onyx-1`. Check each link once after deploying.
+- Faucet: `https://faucet.gno.land`, entry "Onyx Faucet" (`chain_id: "onyx-1"`, served by
+  `https://faucet.onyx.testnets.gno.land`), with request amounts 100, 200 or 300 test GNOT and a captcha (from the faucet
+  site's configuration in its JavaScript). Per-address limits are not stated.
+- Gas actually used (filetests, VM gas including storage writes): PostQuest about 2.1M to 2.7M; a whole quest
+  lifecycle of 17 calls 10.4M. Recommended for every QuestMaster call: `-gas-wanted 10000000 -gas-fee 100000ugnot`
+  (the minimum fee for 10M gas is 10,000 ugnot at today's price; 100,000 ugnot is 0.1 test GNOT and leaves room if
+  the price rises). gnokey simulates a transaction before broadcasting (default `-simulate test`), so too little gas
+  fails before anything is paid. The help page in `r/questmaster/render.gno` still shows
+  `-gas-fee 1000000ugnot -gas-wanted 50000000` (1 GNOT per call): to be changed in the next code task.
+- Deploying (`gnokey maketx addpkg`): flags `-pkgpath`, `-pkgdir`, `-max-deposit`, plus `-gas-fee`, `-gas-wanted`,
+  `-broadcast`, `-chainid`, `-remote`. It uploads every file in the folder, tests included. Sizes: `p/escrow` about
+  36 KB, `r/questmaster` about 101 KB (with filetests); on gnodev the realm's stored size after deploy was about 66 KB,
+  so a 6.6 GNOT deposit. Use `-max-deposit 30000000ugnot` for each package.
+- Licence: the gno repo, which includes the three packages we import, is under the GNO Network General Public License
+  v6 with an "Additional Terms (Strong Attribution)" clause: a user interface that uses a covered work must show an
+  attribution link to "a URL designated by the Licensor", with up to three words such as "built on". No URL is named
+  in the repo at v1.8.0; we use https://gno.land as our best reading. The licence text has no "Everyone is permitted
+  to copy and distribute verbatim copies" sentence, but its section "How to Apply These Terms to Your New Programs"
+  invites other authors to license their programs under it; our LICENSE follows that section. This is our reading,
+  not legal advice.
