@@ -35,8 +35,8 @@ mkdir -p "$OUT"
 export GNOHOME="$(mktemp -d)" # throwaway: gnodev keeps its built-in test key here
 RPC_PORT=36657
 WEB_PORT=38888
-REALM="gno.land/r/questmaster_dev/questmaster"
-WEB="http://127.0.0.1:$WEB_PORT/r/questmaster_dev/questmaster"
+REALM="gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
+WEB="http://127.0.0.1:$WEB_PORT/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 GNODEV_PID=""
 
 cleanup() {

@@ -1,7 +1,10 @@
 // Package questmaster is a GNOT bounty board. A poster locks GNOT on a quest,
 // a builder takes it and submits a link to the work, and the poster approves
 // (paying the builder) or rejects (reopening the quest). If the poster stays
-// silent past the review window, the builder can claim the payout.
+// silent past the review window (about 7 days), the builder can claim the
+// payout. A poster can cancel an open quest for a refund, or close a claimed
+// or submitted one: the builder keeps their turn, and if it ends without
+// approval the reward goes back to the poster.
 //
 // The rules live in the pure package p/escrow. This realm stores quests,
 // holds the coins and moves them only as an escrow move tells it to.
@@ -33,8 +36,8 @@ import (
 	"chain/runtime/unsafe"
 	"strconv"
 
+	"gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow"
 	"gno.land/p/nt/avl/v0"
-	"gno.land/p/questmaster_dev/escrow"
 )
 
 const (
@@ -114,7 +117,8 @@ func ClaimQuest(cur realm, id uint64) {
 	chain.Emit("QuestClaimed", "id", idStr(id), "actor", actor.String())
 }
 
-// UnclaimQuest lets the builder give a Claimed quest back. It becomes Open.
+// UnclaimQuest lets the builder give a Claimed quest back. It opens again, or,
+// if the poster closed it, ends with a refund to the poster.
 func UnclaimQuest(cur realm, id uint64) {
 	actor := requireUserCall(cur)
 	requireNoCoins()

@@ -5,12 +5,12 @@ import (
 	"strings"
 	"testing"
 
+	"gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow"
 	"gno.land/p/nt/testutils/v0"
 	"gno.land/p/nt/uassert/v0"
-	"gno.land/p/questmaster_dev/escrow"
 )
 
-const base = "/r/questmaster_dev/questmaster"
+const base = "/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 
 func has(t *testing.T, page, want, what string) {
 	t.Helper()
@@ -103,13 +103,13 @@ func TestRenderFullBoard(cur realm, t *testing.T) {
 	home := renders(t, "")
 	// open: 6 + 25 = 26; locked: 4+5+6+25 = 40; paid 2+3 = 5; 2 quests paid
 	has(t, home, "| 26 | 40 | 5 | 2 |", "totals")
-	uassert.Equal(t, PageSize, strings.Count(home, "](/r/questmaster_dev/questmaster:quest/"), "first page holds PageSize quests")
+	uassert.Equal(t, PageSize, strings.Count(home, "](/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster:quest/"), "first page holds PageSize quests")
 	has(t, home, "| 31 | [Small task]("+base+":quest/31) | 1 GNOT | 2,000 (about 117 minutes) | 0 |", "newest first")
 	has(t, home, "Page 1 of 2 · [Older →]("+base+"?page=2)", "next link")
 	hasNot(t, home, "Newer", "no prev link on page 1")
 
 	p2 := renders(t, "?page=2")
-	uassert.Equal(t, 6, strings.Count(p2, "](/r/questmaster_dev/questmaster:quest/"), "second page")
+	uassert.Equal(t, 6, strings.Count(p2, "](/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster:quest/"), "second page")
 	has(t, p2, "| 6 | [claimed quest]("+base+":quest/6) | 6 GNOT | 2,000 (about 117 minutes) | 1 |", "rejected quest shows count")
 	has(t, p2, "Page 2 of 2 · [← Newer]("+base+"?page=1)", "prev link")
 	has(t, renders(t, "?page=3"), "This page is empty.", "past the end")
@@ -135,7 +135,7 @@ func TestRenderQuestStates(cur realm, t *testing.T) {
 	has(t, open, "**Claim**", "claim step")
 	has(t, open, "[Open in gnoweb]("+base+"$help&func=ClaimQuest&id=7)", "claim link")
 	has(t, open, "[Open in gnoweb]("+base+"$help&func=CancelQuest&id=7)", "cancel link")
-	has(t, open, `-pkgpath "gno.land/r/questmaster_dev/questmaster" -func "ClaimQuest" -args "7"`, "gnokey claim")
+	has(t, open, `-pkgpath "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster" -func "ClaimQuest" -args "7"`, "gnokey claim")
 	has(t, open, "-chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY", "onyx pinned")
 	hasNot(t, open, "ApproveWork", "no approve when open")
 
@@ -324,7 +324,7 @@ func TestRenderReviewWarningAndFooter(cur realm, t *testing.T) {
 	has(t, renders(t, ""), warn, "warning on home")
 	has(t, renders(t, "help"), warn, "warning on help")
 	has(t, renders(t, "help"), "Anyone except you can claim your quest while it is open; once it is claimed, closing it (below) stops new claims.", "claim note on help")
-	foot := "\n---\n\nBuilt on [gno.land](https://gno.land) · source: TODO-DEPLOY: source repository URL\n"
+	foot := "\n---\n\nBuilt on [gno.land](https://gno.land) · [source](https://github.com/elangrr/questmaster)\n"
 	for _, p := range append(allPaths, "nope", "quest/999") {
 		out := renders(t, p)
 		if !strings.HasSuffix(out, foot) {

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow"
 	"gno.land/p/moul/txlink/v0"
 	"gno.land/p/nt/avl/v0"
-	"gno.land/p/questmaster_dev/escrow"
 )
 
 // Pages (gnoweb shows Render's Markdown):
@@ -31,8 +31,8 @@ const PageSize = 20
 const maxPage = 1_000_000
 
 // SourceRepo is where the source code is published, shown in the footer of
-// every page. Set it before deploying.
-const SourceRepo = "TODO-DEPLOY: source repository URL"
+// every page.
+const SourceRepo = "https://github.com/elangrr/questmaster"
 
 // Render returns the gnoweb page for path, with the footer.
 func Render(path string) string {
@@ -370,7 +370,7 @@ func renderHelp() string {
 		" characters), work window in blocks (" + blocksStr(escrow.MinWorkBlocks) + " to " + blocksStr(escrow.MaxWorkBlocks) + "). " +
 		"Anyone except you can claim your quest while it is open; once it is claimed, closing it (below) stops new claims. " +
 		"Posting also stores the quest on chain. The chain charges a storage deposit for that, paid by the poster on top of the reward: " +
-		"about 0.65 GNOT for a new quest at the default price of 100 ugnot per byte (measured on a local node). It is held by the chain, not by this realm, and is not part of the escrow; when a later call makes the stored data smaller, the chain returns that share to whoever made the call.\n\n")
+		"about 0.65 to 0.8 GNOT for a new quest at 100 ugnot per byte, the price on Onyx (measured on a local node). It is held by the chain, not by this realm, and is not part of the escrow; when a later call makes the stored data smaller, the chain returns that share to whoever made the call.\n\n")
 	b.WriteString("With gnoweb, pick a reward: " + postLinks() + ". The form shows the amount and asks you to confirm adding the coins. " +
 		"For another amount, change `.send=` in the link's address or use gnokey.\n\n")
 	b.WriteString("```\n" + gnokeyCall("PostQuest", "", "", "5000000ugnot") + "\n```\n\n")
@@ -452,7 +452,7 @@ func init() {
 	realmPkgPath = unsafe.CurrentRealm().PkgPath()
 }
 
-// realmPath is this realm's web path, e.g. "/r/questmaster_dev/questmaster".
+// realmPath is this realm's web path, e.g. "/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster".
 func realmPath() string {
 	return strings.TrimPrefix(realmPkgPath, runtime.ChainDomain())
 }

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow"
 	"gno.land/p/nt/avl/v0"
 	"gno.land/p/nt/testutils/v0"
 	"gno.land/p/nt/uassert/v0"
-	"gno.land/p/questmaster_dev/escrow"
 )
 
 // Test notes
@@ -35,7 +35,7 @@ var (
 	carol = testutils.TestAddress("qb_carol")
 	dave  = testutils.TestAddress("qb_dave")
 
-	realmAddr = chain.PackageAddress("gno.land/r/questmaster_dev/questmaster")
+	realmAddr = chain.PackageAddress("gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster")
 )
 
 const (

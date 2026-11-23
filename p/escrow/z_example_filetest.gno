@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"testing"
 
+	"gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow"
 	"gno.land/p/nt/avl/v0"
-	"gno.land/p/questmaster_dev/escrow"
 )
 
 var (

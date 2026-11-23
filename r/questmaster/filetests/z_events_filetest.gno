@@ -1,4 +1,4 @@
-// PKGPATH: gno.land/r/questmaster_dev/questmaster/filetests/z_events_filetest
+// PKGPATH: gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster/filetests/z_events_filetest
 
 // Every state change emits one event with the quest id, the acting address
 // and, where money moves, the amount and recipient.
@@ -8,7 +8,7 @@ import (
 	"chain"
 	"testing"
 
-	"gno.land/r/questmaster_dev/questmaster"
+	"gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 )
 
 const (
@@ -20,7 +20,7 @@ const (
 func post(cur realm, reward int64) uint64 {
 	testing.SetRealm(testing.NewUserRealm(poster))
 	testing.SetOriginSend(chain.Coins{{Denom: "ugnot", Amount: reward}})
-	testing.IssueCoins(chain.PackageAddress("gno.land/r/questmaster_dev/questmaster"), chain.Coins{{Denom: "ugnot", Amount: reward}})
+	testing.IssueCoins(chain.PackageAddress("gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"), chain.Coins{{Denom: "ugnot", Amount: reward}})
 	id := questmaster.PostQuest(cross(cur), "Event quest", "", 1000)
 	testing.SetOriginSend(nil)
 	return id
@@ -94,7 +94,7 @@ func main(cur realm) {
 //         "value": "2000000"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestClaimed",
@@ -108,7 +108,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestUnclaimed",
@@ -122,7 +122,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestClaimed",
@@ -136,7 +136,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestReleased",
@@ -150,7 +150,7 @@ func main(cur realm) {
 //         "value": "g1rzuwh5frve732k4futyw45y78rzuty4626zy6h"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestClaimed",
@@ -164,7 +164,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "WorkSubmitted",
@@ -178,7 +178,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "WorkRejected",
@@ -196,7 +196,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestClaimed",
@@ -210,7 +210,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "WorkSubmitted",
@@ -224,7 +224,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestPaid",
@@ -250,7 +250,7 @@ func main(cur realm) {
 //         "value": "approved"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestPosted",
@@ -268,7 +268,7 @@ func main(cur realm) {
 //         "value": "1000000"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestCancelled",
@@ -294,7 +294,7 @@ func main(cur realm) {
 //         "value": "open"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestPosted",
@@ -312,7 +312,7 @@ func main(cur realm) {
 //         "value": "3000000"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestClaimed",
@@ -326,7 +326,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "WorkSubmitted",
@@ -340,7 +340,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestPaid",
@@ -366,7 +366,7 @@ func main(cur realm) {
 //         "value": "timeout"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestPosted",
@@ -384,7 +384,7 @@ func main(cur realm) {
 //         "value": "4000000"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestClaimed",
@@ -398,7 +398,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestClosing",
@@ -412,7 +412,7 @@ func main(cur realm) {
 //         "value": "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestUnclaimed",
@@ -426,7 +426,7 @@ func main(cur realm) {
 //         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   },
 //   {
 //     "type": "QuestCancelled",
@@ -452,6 +452,6 @@ func main(cur realm) {
 //         "value": "unclaimed"
 //       }
 //     ],
-//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//     "pkg_path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"
 //   }
 // ]
