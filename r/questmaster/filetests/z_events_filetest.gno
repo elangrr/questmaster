@@ -57,15 +57,24 @@ func main(cur realm) {
 	testing.SetRealm(testing.NewUserRealm(builder))
 	questmaster.ClaimQuest(cross(cur), id3)
 	questmaster.SubmitWork(cross(cur), id3, "https://example.com/3")
-	testing.SkipHeights(75_001)
+	testing.SkipHeights(172_801)
 	questmaster.ClaimPayout(cross(cur), id3)
+
+	// quest 4: claimed, closed by the poster, unclaimed -> refund
+	id4 := post(cur, 4_000_000)
+	testing.SetRealm(testing.NewUserRealm(builder))
+	questmaster.ClaimQuest(cross(cur), id4)
+	testing.SetRealm(testing.NewUserRealm(poster))
+	questmaster.CancelQuest(cross(cur), id4)
+	testing.SetRealm(testing.NewUserRealm(builder))
+	questmaster.UnclaimQuest(cross(cur), id4)
 
 	t := questmaster.GetTotals()
 	println(t.Posted, t.Locked, t.Paid, t.Refunded)
 }
 
 // Output:
-// 6000000 0 5000000 1000000
+// 10000000 0 5000000 5000000
 
 // Events:
 // [
@@ -279,6 +288,10 @@ func main(cur realm) {
 //       {
 //         "key": "amount",
 //         "value": "1000000"
+//       },
+//       {
+//         "key": "how",
+//         "value": "open"
 //       }
 //     ],
 //     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
@@ -351,6 +364,92 @@ func main(cur realm) {
 //       {
 //         "key": "how",
 //         "value": "timeout"
+//       }
+//     ],
+//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//   },
+//   {
+//     "type": "QuestPosted",
+//     "attrs": [
+//       {
+//         "key": "id",
+//         "value": "4"
+//       },
+//       {
+//         "key": "actor",
+//         "value": "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"
+//       },
+//       {
+//         "key": "amount",
+//         "value": "4000000"
+//       }
+//     ],
+//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//   },
+//   {
+//     "type": "QuestClaimed",
+//     "attrs": [
+//       {
+//         "key": "id",
+//         "value": "4"
+//       },
+//       {
+//         "key": "actor",
+//         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
+//       }
+//     ],
+//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//   },
+//   {
+//     "type": "QuestClosing",
+//     "attrs": [
+//       {
+//         "key": "id",
+//         "value": "4"
+//       },
+//       {
+//         "key": "actor",
+//         "value": "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"
+//       }
+//     ],
+//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//   },
+//   {
+//     "type": "QuestUnclaimed",
+//     "attrs": [
+//       {
+//         "key": "id",
+//         "value": "4"
+//       },
+//       {
+//         "key": "actor",
+//         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
+//       }
+//     ],
+//     "pkg_path": "gno.land/r/questmaster_dev/questmaster"
+//   },
+//   {
+//     "type": "QuestCancelled",
+//     "attrs": [
+//       {
+//         "key": "id",
+//         "value": "4"
+//       },
+//       {
+//         "key": "actor",
+//         "value": "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj"
+//       },
+//       {
+//         "key": "to",
+//         "value": "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"
+//       },
+//       {
+//         "key": "amount",
+//         "value": "4000000"
+//       },
+//       {
+//         "key": "how",
+//         "value": "unclaimed"
 //       }
 //     ],
 //     "pkg_path": "gno.land/r/questmaster_dev/questmaster"

@@ -508,14 +508,164 @@ func TestNoDoublePayout(cur realm, t *testing.T) {
 }
 
 // Case 10: cancel after Claimed (or Submitted) fails.
-func TestCancelAfterClaim(cur realm, t *testing.T) {
+// Case 10: cancelling a Claimed or Submitted quest refunds nothing: it only
+// marks the quest as closing.
+func TestCancelAfterClaimOnlyCloses(cur realm, t *testing.T) {
 	resetState()
 	cl := claimed(cur, gnot)
 	sub := submitted(cur, gnot)
+	before := takeSnapshot()
+	aliceBefore := bal(alice)
 	testing.SetRealm(testing.NewUserRealm(alice))
 	testing.SetOriginSend(nil)
-	fails(t, cur, "not allowed in the quest's current state", func() { CancelQuest(cross(cur), cl) }, "cancel claimed")
-	fails(t, cur, "not allowed in the quest's current state", func() { CancelQuest(cross(cur), sub) }, "cancel submitted")
+	CancelQuest(cross(cur), cl)
+	CancelQuest(cross(cur), sub)
+	after := takeSnapshot()
+	uassert.Equal(t, before.realm, after.realm, "no coins move on close")
+	uassert.Equal(t, aliceBefore, bal(alice))
+	uassert.True(t, before.totals == after.totals, "totals unchanged on close")
+	uassert.True(t, GetQuest(cl).Closing)
+	uassert.True(t, GetQuest(sub).Closing)
+	uassert.Equal(t, escrow.Claimed.String(), GetQuest(cl).State.String())
+	fails(t, cur, "already closing", func() { CancelQuest(cross(cur), cl) }, "close twice")
+	testing.SetRealm(testing.NewUserRealm(carol))
+	testing.SetOriginSend(nil)
+	fails(t, cur, "only the poster", func() { CancelQuest(cross(cur), sub) }, "stranger close")
+	checkInvariants(t, "close")
+}
+
+// The squatting attack from the security review: a squatter claims, the
+// poster closes, the squatter holds until the work deadline; then anyone can
+// end it, the poster is refunded exactly once and nobody can claim again.
+func TestCloseStopsSquatting(cur realm, t *testing.T) {
+	resetState()
+	eve := testutils.TestAddress("qb_eve")
+	mal := testutils.TestAddress("qb_mal")
+	id := post(cur, alice, 5*gnot, "real task")
+	testing.SetRealm(testing.NewUserRealm(eve))
+	testing.SetOriginSend(nil)
+	ClaimQuest(cross(cur), id)
+
+	testing.SetRealm(testing.NewUserRealm(alice))
+	testing.SetOriginSend(nil)
+	CancelQuest(cross(cur), id)
+	uassert.False(t, containsID(allPages(OpenQuestIDs), id), "closing quest is not open")
+	checkInvariants(t, "closed")
+
+	d := GetQuest(id).WorkDeadline
+	testing.SkipHeights(d - runtime.ChainHeight())
+	testing.SetRealm(testing.NewUserRealm(mal))
+	testing.SetOriginSend(nil)
+	fails(t, cur, "work deadline has not passed", func() { ReleaseQuest(cross(cur), id) }, "release at the deadline")
+	testing.SkipHeights(1)
+
+	aliceBefore, malBefore, realmBefore := bal(alice), bal(mal), bal(realmAddr)
+	totBefore := GetTotals()
+	ReleaseQuest(cross(cur), id)
+	uassert.Equal(t, aliceBefore+5*gnot, bal(alice), "poster refunded once")
+	uassert.Equal(t, malBefore, bal(mal), "the caller gets nothing")
+	uassert.Equal(t, realmBefore-5*gnot, bal(realmAddr))
+	uassert.Equal(t, escrow.Cancelled.String(), GetQuest(id).State.String())
+	uassert.Equal(t, totBefore.Refunded+5*gnot, GetTotals().Refunded)
+	uassert.Equal(t, totBefore.OpenQuests, GetTotals().OpenQuests)
+	uassert.False(t, containsID(allPages(OpenQuestIDs), id))
+	fails(t, cur, "not allowed in the quest's current state", func() { ClaimQuest(cross(cur), id) }, "re-claim after close")
+	fails(t, cur, "not allowed in the quest's current state", func() { ReleaseQuest(cross(cur), id) }, "release twice")
+	testing.SetRealm(testing.NewUserRealm(alice))
+	testing.SetOriginSend(nil)
+	fails(t, cur, "not allowed in the quest's current state", func() { CancelQuest(cross(cur), id) }, "cancel after refund")
+	checkInvariants(t, "squat released")
+}
+
+func TestCloseThenUnclaim(cur realm, t *testing.T) {
+	resetState()
+	id := claimed(cur, 3*gnot)
+	testing.SetRealm(testing.NewUserRealm(alice))
+	testing.SetOriginSend(nil)
+	CancelQuest(cross(cur), id)
+	aliceBefore := bal(alice)
+	testing.SetRealm(testing.NewUserRealm(bob))
+	testing.SetOriginSend(nil)
+	UnclaimQuest(cross(cur), id)
+	uassert.Equal(t, aliceBefore+3*gnot, bal(alice))
+	uassert.Equal(t, escrow.Cancelled.String(), GetQuest(id).State.String())
+	uassert.False(t, containsID(allPages(OpenQuestIDs), id))
+	checkInvariants(t, "close then unclaim")
+}
+
+func TestCloseThenReject(cur realm, t *testing.T) {
+	resetState()
+	id := submitted(cur, 4*gnot)
+	testing.SetRealm(testing.NewUserRealm(alice))
+	testing.SetOriginSend(nil)
+	CancelQuest(cross(cur), id)
+	aliceBefore, bobBefore := bal(alice), bal(bob)
+	RejectWork(cross(cur), id, "not what I asked")
+	uassert.Equal(t, aliceBefore+4*gnot, bal(alice))
+	uassert.Equal(t, bobBefore, bal(bob))
+	q := GetQuest(id)
+	uassert.Equal(t, escrow.Cancelled.String(), q.State.String())
+	uassert.Equal(t, 1, q.RejectCount)
+	uassert.False(t, containsID(allPages(OpenQuestIDs), id))
+	checkInvariants(t, "close then reject")
+}
+
+// While closing, the builder keeps every right.
+func TestCloseStillPaysBuilder(cur realm, t *testing.T) {
+	resetState()
+	a := claimed(cur, 2*gnot)
+	testing.SetRealm(testing.NewUserRealm(alice))
+	testing.SetOriginSend(nil)
+	CancelQuest(cross(cur), a)
+	testing.SetRealm(testing.NewUserRealm(bob))
+	testing.SetOriginSend(nil)
+	SubmitWork(cross(cur), a, link)
+	bobBefore := bal(bob)
+	testing.SetRealm(testing.NewUserRealm(alice))
+	testing.SetOriginSend(nil)
+	ApproveWork(cross(cur), a)
+	uassert.Equal(t, bobBefore+2*gnot, bal(bob), "approve while closing pays the builder")
+
+	b := submitted(cur, 3*gnot)
+	testing.SetRealm(testing.NewUserRealm(alice))
+	testing.SetOriginSend(nil)
+	CancelQuest(cross(cur), b)
+	testing.SkipHeights(escrow.ReviewBlocks + 1)
+	bobBefore = bal(bob)
+	testing.SetRealm(testing.NewUserRealm(bob))
+	testing.SetOriginSend(nil)
+	ClaimPayout(cross(cur), b)
+	uassert.Equal(t, bobBefore+3*gnot, bal(bob), "timeout payout while closing pays the builder")
+	checkInvariants(t, "close still pays")
+}
+
+// The timeout rule, documented: a builder who submits anything is paid after
+// the review window if the poster does nothing; a reject at the last block of
+// the window prevents it.
+func TestJunkSubmissionTimeout(cur realm, t *testing.T) {
+	resetState()
+	id := claimed(cur, 5*gnot)
+	testing.SetRealm(testing.NewUserRealm(bob))
+	testing.SetOriginSend(nil)
+	SubmitWork(cross(cur), id, "https://x")
+	testing.SkipHeights(GetQuest(id).ReviewDeadline - runtime.ChainHeight() + 1)
+	bobBefore := bal(bob)
+	ClaimPayout(cross(cur), id)
+	uassert.Equal(t, bobBefore+5*gnot, bal(bob), "silent poster: builder paid")
+
+	id2 := claimed(cur, 5*gnot)
+	testing.SetRealm(testing.NewUserRealm(bob))
+	testing.SetOriginSend(nil)
+	SubmitWork(cross(cur), id2, "https://x")
+	testing.SkipHeights(GetQuest(id2).ReviewDeadline - runtime.ChainHeight())
+	testing.SetRealm(testing.NewUserRealm(alice))
+	testing.SetOriginSend(nil)
+	RejectWork(cross(cur), id2, "junk")
+	testing.SkipHeights(1)
+	testing.SetRealm(testing.NewUserRealm(bob))
+	testing.SetOriginSend(nil)
+	fails(t, cur, "not allowed in the quest's current state", func() { ClaimPayout(cross(cur), id2) }, "payout after reject")
+	checkInvariants(t, "junk timeout")
 }
 
 // Case 11: text over the limits and bad links fail at realm level.
@@ -718,7 +868,11 @@ func TestMixedRunInvariant(cur realm, t *testing.T) {
 				name, fn = "claim", func() { ClaimQuest(cross(cur), id) }
 			}
 		case escrow.Claimed:
-			switch rnd(4) {
+			switch rnd(5) {
+			case 4:
+				testing.SetRealm(testing.NewUserRealm(pick(poster)))
+				testing.SetOriginSend(nil)
+				name, fn = "close", func() { CancelQuest(cross(cur), id) }
 			case 0:
 				testing.SetRealm(testing.NewUserRealm(pick(builder)))
 				testing.SetOriginSend(nil)
@@ -734,7 +888,11 @@ func TestMixedRunInvariant(cur realm, t *testing.T) {
 				name, fn = "submit", func() { SubmitWork(cross(cur), id, link) }
 			}
 		case escrow.Submitted:
-			switch k := rnd(4); {
+			switch k := rnd(5); {
+			case k == 4:
+				testing.SetRealm(testing.NewUserRealm(pick(poster)))
+				testing.SetOriginSend(nil)
+				name, fn = "close", func() { CancelQuest(cross(cur), id) }
 			case k == 0 || (k < 3 && runtime.ChainHeight() > q.ReviewDeadline):
 				testing.SetRealm(testing.NewUserRealm(pick(poster)))
 				testing.SetOriginSend(nil)
@@ -761,6 +919,9 @@ func TestMixedRunInvariant(cur realm, t *testing.T) {
 			done["failed"]++
 		} else {
 			done[name]++
+			if q.Closing && (name == "unclaim" || name == "release" || name == "reject") {
+				done["closed-refund"]++
+			}
 		}
 		checkInvariants(t, name)
 
@@ -772,7 +933,7 @@ func TestMixedRunInvariant(cur realm, t *testing.T) {
 			t.Fatalf("step %d %s: coins not conserved: %d != %d", step, name, total, start+issued)
 		}
 	}
-	for _, k := range []string{"post", "claim", "cancel", "unclaim", "release", "submit", "approve", "reject", "timeout", "failed"} {
+	for _, k := range []string{"post", "claim", "cancel", "unclaim", "release", "submit", "approve", "reject", "timeout", "failed", "close", "closed-refund"} {
 		if done[k] == 0 {
 			t.Errorf("mixed run never did %q: %v", k, done)
 		}

@@ -119,24 +119,25 @@ func UnclaimQuest(cur realm, id uint64) {
 	actor := requireUserCall(cur)
 	requireNoCoins()
 	q := mustGet(id)
-	check(q.Unclaim(actor, runtime.ChainHeight()))
-
-	openIDs.Set(questKey(id), true)
+	p, err := q.Unclaim(actor, runtime.ChainHeight())
+	check(err)
 
 	chain.Emit("QuestUnclaimed", "id", idStr(id), "actor", actor.String())
+	endTurn(id, p, actor, "unclaimed", cur)
 }
 
-// ReleaseQuest reopens a Claimed quest whose work deadline has passed. Anyone
-// may call it.
+// ReleaseQuest ends the builder's turn on a Claimed quest whose work deadline
+// has passed. Anyone may call it. The quest opens again, or, if the poster
+// closed it, ends with a refund to the poster.
 func ReleaseQuest(cur realm, id uint64) {
 	actor := requireUserCall(cur)
 	requireNoCoins()
 	q := mustGet(id)
-	check(q.Release(actor, runtime.ChainHeight()))
-
-	openIDs.Set(questKey(id), true)
+	p, err := q.Release(actor, runtime.ChainHeight())
+	check(err)
 
 	chain.Emit("QuestReleased", "id", idStr(id), "actor", actor.String())
+	endTurn(id, p, actor, "released", cur)
 }
 
 // SubmitWork sends the link to the work (must start with https://). Only the
@@ -164,23 +165,29 @@ func ApproveWork(cur realm, id uint64) {
 	send(p, cur)
 }
 
-// RejectWork refuses the submitted work with a reason. The quest becomes Open
-// again and its public reject count goes up. Only the poster, up to and
-// including the review deadline block.
+// RejectWork refuses the submitted work with a reason. Its public reject count
+// goes up. The quest opens again, or, if the poster closed it, ends with a
+// refund to the poster. Only the poster, up to and including the review
+// deadline block.
 func RejectWork(cur realm, id uint64, reason string) {
 	actor := requireUserCall(cur)
 	requireNoCoins()
 	q := mustGet(id)
 	builder := q.Builder()
-	check(q.Reject(actor, reason, runtime.ChainHeight()))
-
-	openIDs.Set(questKey(id), true)
+	p, err := q.Reject(actor, reason, runtime.ChainHeight())
+	check(err)
 
 	chain.Emit("WorkRejected", "id", idStr(id), "actor", actor.String(), "builder", builder.String())
+	endTurn(id, p, actor, "rejected", cur)
 }
 
-// CancelQuest closes an Open quest and refunds the reward to the poster. Only
-// the poster.
+// CancelQuest is the poster's way out. Only the poster.
+//   - Open quest: it ends at once and the reward is refunded.
+//   - Claimed or Submitted quest: it is marked as closing and no coins move.
+//     The builder keeps their turn (submit, approval, timeout payout); when
+//     the turn ends without approval (unclaim, release after the work
+//     deadline, or reject), the quest ends and the reward goes back to the
+//     poster instead of the quest opening again.
 func CancelQuest(cur realm, id uint64) {
 	actor := requireUserCall(cur)
 	requireNoCoins()
@@ -188,11 +195,34 @@ func CancelQuest(cur realm, id uint64) {
 	p, err := q.Cancel(actor, runtime.ChainHeight())
 	check(err)
 
+	if !p.Due() {
+		chain.Emit("QuestClosing", "id", idStr(id), "actor", actor.String())
+		return
+	}
 	openIDs.Remove(questKey(id))
+	settleRefund(id, p, actor, "open", cur)
+}
+
+// endTurn finishes Unclaim, Release and Reject: the quest opens again, or a
+// closing quest ends with the refund p.
+func endTurn(id uint64, p escrow.Payout, actor address, how string, rlm realm) {
+	if !p.Due() {
+		openIDs.Set(questKey(id), true)
+		return
+	}
+	settleRefund(id, p, actor, how, rlm)
+}
+
+// settleRefund updates totals, emits QuestCancelled and sends the refund
+// last. The quest is already Cancelled (final) when it is called.
+func settleRefund(id uint64, p escrow.Payout, actor address, how string, rlm realm) {
+	if p.Kind != escrow.RefundPoster {
+		panic("questmaster: internal error: unexpected payout kind")
+	}
 	totalLocked -= p.Amount
 	totalRefunded += p.Amount
-	chain.Emit("QuestCancelled", "id", idStr(id), "actor", actor.String(), "to", p.To.String(), "amount", amountStr(p.Amount))
-	send(p, cur)
+	chain.Emit("QuestCancelled", "id", idStr(id), "actor", actor.String(), "to", p.To.String(), "amount", amountStr(p.Amount), "how", how)
+	send(p, rlm)
 }
 
 // ClaimPayout pays the builder when the poster has not answered within the
@@ -230,6 +260,7 @@ type QuestView struct {
 	ReviewDeadline   int64 // last block to reject; 0 unless Submitted
 	RejectCount      int
 	LastRejectReason string
+	Closing          bool // the poster closed it; the reward returns when the builder's turn ends without approval
 	CanRelease       bool // ReleaseQuest would succeed now
 	CanClaimPayout   bool // the builder could call ClaimPayout now
 }
@@ -255,6 +286,7 @@ func GetQuest(id uint64) QuestView {
 		ReviewDeadline:   q.ReviewDeadline(),
 		RejectCount:      q.RejectCount(),
 		LastRejectReason: q.LastRejectReason(),
+		Closing:          q.Closing(),
 		CanRelease:       q.CanRelease(h),
 		CanClaimPayout:   q.CanClaimPayout(h),
 	}

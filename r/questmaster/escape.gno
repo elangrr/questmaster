@@ -9,10 +9,10 @@ import (
 // Escaping. Every piece of user text that reaches a page (titles, details,
 // reject reasons, work links) goes through one of the helpers below, which
 // wrap p/nt/markdown/sanitize/v0 (the sanitizer that gnoweb's own markdown
-// tests are written against) and add one gnoweb-specific step.
+// tests are written against) plus the gnoweb-specific steps described below.
 //
 // Nothing a user types can produce a heading, list, table cell break, new
-// table row, link, image, HTML tag or gnoweb extension:
+// table row, link, image, HTML tag, mention link or math:
 //   - esc:       single-line slots (headings, link text). Folds line breaks to
 //     spaces and backslash-escapes Markdown punctuation and `<`, `&`.
 //   - escCell:   table cells. As esc, plus `|` and tabs.
@@ -23,13 +23,19 @@ import (
 //     and nothing unsafe is left in the target; otherwise plain text. Its
 //     visible text is always the escaped URL itself, never user-chosen text.
 //
-// gnoweb also turns "@name" and " g1…" (an address after a space) into
-// profile links. noMentions defuses both in user text: "@" becomes "\@" (a
-// Markdown escape that renders as "@") and the space before "g1" becomes the
-// entity "&#32;" (renders as a space but does not trigger the parser).
+// gnoweb adds two extensions the sanitizer does not know about, so every
+// helper also runs gnowebSafe on its output:
+//   - "@name" and " g1…" (an address after a space) become profile links.
+//     "@" becomes "\@" (a Markdown escape that renders as "@"), the space
+//     before "g1" becomes the entity "&#32;", and a "g1" at the very start of
+//     the text becomes "&#103;1", because the realm itself often puts a space
+//     right before user text ("# Quest 1: ", "| ", "> ").
+//   - "$…$" and "$$…$$" become math. Every "$" becomes "\$".
+// Each renders as the plain character in gnoweb; checked in the real renderer
+// by scripts/local-flow.sh.
 
-func esc(s string) string     { return noMentions(sanitize.InlineText(s)) }
-func escCell(s string) string { return noMentions(sanitize.TableCell(s)) }
+func esc(s string) string     { return gnowebSafe(sanitize.InlineText(s)) }
+func escCell(s string) string { return gnowebSafe(sanitize.TableCell(s)) }
 
 // escBlock shows multi-line user text as a blockquote that keeps its line
 // breaks but nothing else: every line is escaped like a table cell (so no
@@ -65,9 +71,14 @@ func escBlock(s string) string {
 	return "\n" + out + "\n"
 }
 
-func noMentions(s string) string {
+// gnowebSafe applies the gnoweb-specific steps described above.
+func gnowebSafe(s string) string {
 	s = strings.ReplaceAll(s, "@", `\@`)
+	s = strings.ReplaceAll(s, "$", `\$`)
 	s = strings.ReplaceAll(s, " g1", "&#32;g1")
+	if strings.HasPrefix(s, "g1") {
+		s = "&#103;1" + s[2:]
+	}
 	return s
 }
 

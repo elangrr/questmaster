@@ -49,6 +49,12 @@ func main(cur realm) {
 
 	post(cur, 1_200_000, "Fix typos in docs/plan.md", "Any typo counts.")
 
+	closing := post(cur, 2_000_000, "Draw a logo", "")
+	testing.SetRealm(testing.NewUserRealm(builder))
+	questmaster.ClaimQuest(cross(cur), closing)
+	testing.SetRealm(testing.NewUserRealm(poster))
+	questmaster.CancelQuest(cross(cur), closing)
+
 	println(questmaster.Render(""))
 	println("=====")
 	println(questmaster.Render("quest/4"))
@@ -56,6 +62,8 @@ func main(cur realm) {
 	println(questmaster.Render("paid"))
 	println("=====")
 	println(questmaster.Render("builder/" + builder.String()))
+	println("=====")
+	println(questmaster.Render("quest/6"))
 }
 
 // Output:
@@ -71,7 +79,7 @@ func main(cur realm) {
 //
 // | Open quests | GNOT locked | GNOT paid out | Quests paid |
 // |---|---|---|---|
-// | 1 | 9.2 | 2.5 | 1 |
+// | 1 | 11.2 | 2.5 | 1 |
 //
 // ## Open quests
 //
@@ -85,14 +93,23 @@ func main(cur realm) {
 // 2. **Claim.** Anyone except the poster takes the quest. Only one builder works on a quest at a time.
 // 3. **Submit.** The builder sends a link to the work (it must start with `https://`) before the work window ends.
 // 4. **Review.** The poster approves (the builder is paid at once) or rejects with a reason (the quest opens again, and the reject count goes up for everyone to see).
-// 5. **Paid.** The reward goes to the builder. A poster can also cancel an open quest and get the reward back.
+// 5. **Paid.** The reward goes to the builder.
+//
+// A poster can cancel an open quest and get the reward back at once. Anyone can claim an open quest; once a builder has it, the poster can **close** the quest instead: the builder keeps their turn, and if it ends without approval the reward goes back to the poster.
+//
+// > [!WARNING]
+// > **Posters: check your quest.** If you do not approve or reject a submission within the review window (about 7 days), the builder is paid automatically.
 //
 // Two deadlines keep things moving:
 //
 // - **Work window** (set by the poster, 1,000 to 2,200,000 blocks): if the builder has not submitted by then, anyone can release the quest so someone else can take it.
-// - **Review window** (75,000 blocks, about 3 days): if the poster has not approved or rejected by then, the builder can claim the reward.
+// - **Review window** (172,800 blocks, about 7 days): if the poster has not approved or rejected by then, the builder can claim the reward.
 //
 // _Times are approximate, at about 3.5 seconds per block; deadlines are exact block heights._
+//
+// ---
+//
+// Built on [gno.land](https://gno.land) · source: TODO-DEPLOY: source repository URL
 //
 // =====
 // # Quest 4: Add a dark theme to the demo page
@@ -108,7 +125,7 @@ func main(cur realm) {
 // | Work window | 20,000 blocks (about 19 hours) |
 // | Posted at block | 123 |
 // | Submitted at block | 123 |
-// | Review deadline | block 75,123 (about 3 days left) |
+// | Review deadline | block 172,923 (about 7 days left) |
 // | Work | [https://github\.com/example/questmaster/pull/9](https://github.com/example/questmaster/pull/9) |
 // | Times rejected | 0 |
 // | Current block | 123 |
@@ -119,19 +136,25 @@ func main(cur realm) {
 //
 // ## What can happen next
 //
-// If the poster does not answer by block 75,123, the builder can claim the reward from block 75,124.
+// If the poster does not answer by block 172,923, the builder can claim the reward from block 172,924.
 //
 // - **Approve**: the poster accepts the work and the builder is paid 5 GNOT. [Open in gnoweb](/r/questmaster_dev/questmaster$help&func=ApproveWork&id=4)
-// - **Reject**: the poster refuses the work with a reason, until block 75,123. The quest opens again. [Open in gnoweb](/r/questmaster_dev/questmaster$help&func=RejectWork&id=4)
+// - **Reject**: the poster refuses the work with a reason, until block 172,923. The quest opens again. [Open in gnoweb](/r/questmaster_dev/questmaster$help&func=RejectWork&id=4)
+// - **Close quest**: the poster stops the quest. No coins move now; the builder keeps their turn, and if it ends without approval the reward goes back to the poster. It cannot be undone. [Open in gnoweb](/r/questmaster_dev/questmaster$help&func=CancelQuest&id=4)
 //
 // With gnokey on Onyx (replace `KEY` with your key name):
 //
 // ```
-// gnokey maketx call -pkgpath "gno.land/r/questmaster_dev/questmaster" -func "ApproveWork" -args "4" -gas-fee 1000000ugnot -gas-wanted 50000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
-// gnokey maketx call -pkgpath "gno.land/r/questmaster_dev/questmaster" -func "RejectWork" -args "4" -args "What is missing" -gas-fee 1000000ugnot -gas-wanted 50000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
+// gnokey maketx call -pkgpath "gno.land/r/questmaster_dev/questmaster" -func "ApproveWork" -args "4" -gas-fee 100000ugnot -gas-wanted 10000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
+// gnokey maketx call -pkgpath "gno.land/r/questmaster_dev/questmaster" -func "RejectWork" -args "4" -args "What is missing" -gas-fee 100000ugnot -gas-wanted 10000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
+// gnokey maketx call -pkgpath "gno.land/r/questmaster_dev/questmaster" -func "CancelQuest" -args "4" -gas-fee 100000ugnot -gas-wanted 10000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
 // ```
 //
 // _Times are approximate, at about 3.5 seconds per block; deadlines are exact block heights._
+//
+// ---
+//
+// Built on [gno.land](https://gno.land) · source: TODO-DEPLOY: source repository URL
 //
 // =====
 // # Paid quests
@@ -145,6 +168,10 @@ func main(cur realm) {
 // | 1 | [Translate the README to Indonesian](/r/questmaster_dev/questmaster:quest/1) | 2.5 GNOT | [g1us8428…njlj](/r/questmaster_dev/questmaster:builder/g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj) | 0 |
 //
 //
+// ---
+//
+// Built on [gno.land](https://gno.land) · source: TODO-DEPLOY: source repository URL
+//
 // =====
 // # Builder g1us8428…njlj
 //
@@ -156,6 +183,57 @@ func main(cur realm) {
 //
 // | # | Quest | Reward | State | Poster |
 // |---|---|---|---|---|
+// | 6 | [Draw a logo](/r/questmaster_dev/questmaster:quest/6) | 2 GNOT | Claimed (work in progress), closing | [g1jg8mtu…sqf5](/r/questmaster_dev/questmaster:poster/g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5) |
 // | 4 | [Add a dark theme to the demo page](/r/questmaster_dev/questmaster:quest/4) | 5 GNOT | Submitted (waiting for review) | [g1jg8mtu…sqf5](/r/questmaster_dev/questmaster:poster/g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5) |
 // | 3 | [Write a gnokey cheat sheet](/r/questmaster_dev/questmaster:quest/3) | 3 GNOT | Claimed (work in progress) | [g1jg8mtu…sqf5](/r/questmaster_dev/questmaster:poster/g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5) |
 // | 1 | [Translate the README to Indonesian](/r/questmaster_dev/questmaster:quest/1) | 2.5 GNOT | Paid | [g1jg8mtu…sqf5](/r/questmaster_dev/questmaster:poster/g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5) |
+//
+//
+// ---
+//
+// Built on [gno.land](https://gno.land) · source: TODO-DEPLOY: source repository URL
+//
+// =====
+// # Quest 6: Draw a logo
+//
+// [Board](/r/questmaster_dev/questmaster) · [Help](/r/questmaster_dev/questmaster:help)
+//
+// | | |
+// |---|---|
+// | State | **Claimed (work in progress), closing** |
+// | Reward | 2 GNOT |
+// | Poster | [g1jg8mtu…sqf5](/r/questmaster_dev/questmaster:poster/g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5) |
+// | Builder | [g1us8428…njlj](/r/questmaster_dev/questmaster:builder/g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj) |
+// | Work window | 20,000 blocks (about 19 hours) |
+// | Posted at block | 123 |
+// | Claimed at block | 123 |
+// | Work deadline | block 20,123 (about 19 hours left) |
+// | Times rejected | 0 |
+// | Current block | 123 |
+//
+// > [!NOTE]
+// > **Closing**: the reward returns to the poster when the current builder's turn ends, unless the work is approved.
+//
+// ## Details
+//
+// _No details given._
+//
+// ## What can happen next
+//
+// If nothing is submitted by block 20,123, anyone can end the quest from block 20,124 and the reward goes back to the poster.
+//
+// - **Submit work**: the builder sends a link to the work (starting with `https://`), until block 20,123. [Open in gnoweb](/r/questmaster_dev/questmaster$help&func=SubmitWork&id=6)
+// - **Unclaim**: the builder gives the quest back. It is closing, so it ends and the reward goes back to the poster. [Open in gnoweb](/r/questmaster_dev/questmaster$help&func=UnclaimQuest&id=6)
+//
+// With gnokey on Onyx (replace `KEY` with your key name):
+//
+// ```
+// gnokey maketx call -pkgpath "gno.land/r/questmaster_dev/questmaster" -func "SubmitWork" -args "6" -args "https://link-to-your-work" -gas-fee 100000ugnot -gas-wanted 10000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
+// gnokey maketx call -pkgpath "gno.land/r/questmaster_dev/questmaster" -func "UnclaimQuest" -args "6" -gas-fee 100000ugnot -gas-wanted 10000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
+// ```
+//
+// _Times are approximate, at about 3.5 seconds per block; deadlines are exact block heights._
+//
+// ---
+//
+// Built on [gno.land](https://gno.land) · source: TODO-DEPLOY: source repository URL

@@ -1,6 +1,7 @@
 package questmaster
 
 import (
+	"chain/runtime"
 	"strings"
 	"testing"
 
@@ -160,7 +161,7 @@ func TestRenderQuestStates(cur realm, t *testing.T) {
 	has(t, rejected, "| Times rejected | 1 |", "reject count")
 
 	has(t, renders(t, "quest/1"), "Nothing: this quest is finished and the builder was paid 2 GNOT.", "paid quest")
-	has(t, renders(t, "quest/3"), "Nothing: the poster cancelled this quest", "cancelled quest")
+	has(t, renders(t, "quest/3"), "Nothing: this quest was cancelled and the reward went back to the poster", "cancelled quest")
 
 	// after the deadlines the late moves appear and the early ones go
 	testing.SkipHeights(escrow.ReviewBlocks + 1)
@@ -284,4 +285,80 @@ func TestFormatHelpers(t *testing.T) {
 	uassert.Equal(t, "about 89 days", approx(2_200_000))
 	uassert.Equal(t, "passed", left(10, 11))
 	uassert.Equal(t, "about a minute left", left(10, 10))
+}
+
+func TestRenderClosing(cur realm, t *testing.T) {
+	resetState()
+	cl := claimed(cur, 2*gnot)
+	sub := submitted(cur, 3*gnot)
+	// before closing: the poster sees "Close quest" on claimed and submitted quests
+	has(t, renders(t, "quest/1"), "**Close quest**", "close offered on claimed")
+	has(t, renders(t, "quest/2"), "**Close quest**", "close offered on submitted")
+	has(t, renders(t, "quest/1"), "func=CancelQuest&id=1", "close link")
+
+	testing.SetRealm(testing.NewUserRealm(alice))
+	testing.SetOriginSend(nil)
+	CancelQuest(cross(cur), cl)
+	CancelQuest(cross(cur), sub)
+
+	c := renders(t, "quest/1")
+	has(t, c, "| State | **Claimed (work in progress), closing** |", "closing state")
+	has(t, c, "> **Closing**: the reward returns to the poster when the current builder's turn ends, unless the work is approved.", "closing note")
+	has(t, c, "It is closing, so it ends and the reward goes back to the poster.", "unclaim text while closing")
+	has(t, c, "anyone can end the quest from block", "release text while closing")
+	hasNot(t, c, "**Close quest**", "no second close")
+	s := renders(t, "quest/2")
+	has(t, s, "The quest is closing, so it ends and the reward goes back to the poster.", "reject text while closing")
+	hasNot(t, s, "**Close quest**", "no second close")
+	has(t, renders(t, "poster/"+alice.String()), "Claimed (work in progress), closing", "closing mark in table")
+	has(t, renders(t, ""), "No open quests right now.", "closing quests are not open")
+
+	testing.SkipHeights(GetQuest(cl).WorkDeadline - runtime.ChainHeight() + 1)
+	has(t, renders(t, "quest/1"), "so anyone can end the quest; the reward goes back to the poster.", "release while closing")
+}
+
+func TestRenderReviewWarningAndFooter(cur realm, t *testing.T) {
+	board(cur)
+	warn := "**Posters: check your quest.** If you do not approve or reject a submission within the review window (about 7 days), the builder is paid automatically."
+	has(t, renders(t, ""), warn, "warning on home")
+	has(t, renders(t, "help"), warn, "warning on help")
+	has(t, renders(t, "help"), "Anyone except you can claim your quest while it is open; once it is claimed, closing it (below) stops new claims.", "claim note on help")
+	foot := "\n---\n\nBuilt on [gno.land](https://gno.land) · source: TODO-DEPLOY: source repository URL\n"
+	for _, p := range append(allPaths, "nope", "quest/999") {
+		out := renders(t, p)
+		if !strings.HasSuffix(out, foot) {
+			t.Fatalf("page %q does not end with the footer", p)
+		}
+	}
+}
+
+// Math ($...$) and mention links at the start of user text are neutralised.
+func TestRenderMathAndLeadingAddress(cur realm, t *testing.T) {
+	resetState()
+	addr := "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"
+	id := postD(cur, alice, gnot, addr+" pays $x$", "$$y$$ and $z$\n"+addr+" line two")
+	testing.SetRealm(testing.NewUserRealm(bob))
+	testing.SetOriginSend(nil)
+	ClaimQuest(cross(cur), id)
+	SubmitWork(cross(cur), id, "https://e.vil/$x$")
+	testing.SetRealm(testing.NewUserRealm(alice))
+	testing.SetOriginSend(nil)
+	RejectWork(cross(cur), id, addr+" no $$m$$")
+
+	id2 := postD(cur, alice, gnot, "Link with dollars", "")
+	testing.SetRealm(testing.NewUserRealm(bob))
+	testing.SetOriginSend(nil)
+	ClaimQuest(cross(cur), id2)
+	SubmitWork(cross(cur), id2, "https://e.vil/$x$")
+
+	q := renders(t, "quest/1")
+	has(t, q, "# Quest 1: &#103;1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5 pays \\$x\\$\n", "title in heading")
+	has(t, q, "> \\$\\$y\\$\\$ and \\$z\\$  \n> &#103;1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5 line two  \n", "details lines")
+	has(t, q, "> &#103;1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5 no \\$\\$m\\$\\$  \n", "reason line")
+	has(t, renders(t, "poster/"+alice.String()), "| 1 | [&#103;1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5 pays \\$x\\$]("+base+":quest/1) |", "title in a table cell")
+	has(t, renders(t, "quest/2"), "| Work | [https://e\\.vil/\\$x\\$](https://e.vil/$x$) |", "dollar in the link text")
+	for _, p := range []string{q, renders(t, "quest/2")} {
+		hasNot(t, p, " "+addr, "raw address after a space")
+		hasNot(t, p, " $", "raw dollar after a space")
+	}
 }

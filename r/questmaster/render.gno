@@ -30,8 +30,25 @@ const PageSize = 20
 // maxPage bounds ?page= so offsets stay small.
 const maxPage = 1_000_000
 
-// Render returns the gnoweb page for path.
+// SourceRepo is where the source code is published, shown in the footer of
+// every page. Set it before deploying.
+const SourceRepo = "TODO-DEPLOY: source repository URL"
+
+// Render returns the gnoweb page for path, with the footer.
 func Render(path string) string {
+	return renderPage(path) + footer()
+}
+
+// footer ends every page: attribution and where the source is.
+func footer() string {
+	src := "source: " + SourceRepo
+	if strings.HasPrefix(SourceRepo, "https://") {
+		src = "[source](" + SourceRepo + ")"
+	}
+	return "\n---\n\nBuilt on [gno.land](https://gno.land) · " + src + "\n"
+}
+
+func renderPage(path string) string {
 	p, query := splitQuery(path)
 	page := pageArg(query)
 	switch {
@@ -104,7 +121,9 @@ func renderHome(page int) string {
 	b.WriteString("2. **Claim.** Anyone except the poster takes the quest. Only one builder works on a quest at a time.\n")
 	b.WriteString("3. **Submit.** The builder sends a link to the work (it must start with `https://`) before the work window ends.\n")
 	b.WriteString("4. **Review.** The poster approves (the builder is paid at once) or rejects with a reason (the quest opens again, and the reject count goes up for everyone to see).\n")
-	b.WriteString("5. **Paid.** The reward goes to the builder. A poster can also cancel an open quest and get the reward back.\n\n")
+	b.WriteString("5. **Paid.** The reward goes to the builder.\n\n")
+	b.WriteString("A poster can cancel an open quest and get the reward back at once. Anyone can claim an open quest; once a builder has it, the poster can **close** the quest instead: the builder keeps their turn, and if it ends without approval the reward goes back to the poster.\n\n")
+	b.WriteString(reviewWarning())
 	b.WriteString("Two deadlines keep things moving:\n\n")
 	b.WriteString("- **Work window** (set by the poster, " + blocksStr(escrow.MinWorkBlocks) + " to " + blocksStr(escrow.MaxWorkBlocks) +
 		" blocks): if the builder has not submitted by then, anyone can release the quest so someone else can take it.\n")
@@ -127,7 +146,7 @@ func renderQuest(id uint64) string {
 	b.WriteString("[Board](" + pageURL("") + ") · [Help](" + pageURL("help") + ")\n\n")
 
 	b.WriteString("| | |\n|---|---|\n")
-	b.WriteString("| State | **" + stateText(q.State()) + "** |\n")
+	b.WriteString("| State | **" + questState(q) + "** |\n")
 	b.WriteString("| Reward | " + gnotStr(q.Reward()) + " GNOT |\n")
 	b.WriteString("| Poster | " + userLink(q.Poster(), true) + " |\n")
 	if q.Builder() != "" {
@@ -148,6 +167,9 @@ func renderQuest(id uint64) string {
 	}
 	b.WriteString("| Times rejected | " + strconv.Itoa(q.RejectCount()) + " |\n")
 	b.WriteString("| Current block | " + blocksStr(h) + " |\n\n")
+	if q.Closing() {
+		b.WriteString("> [!NOTE]\n> **Closing**: the reward returns to the poster when the current builder's turn ends, unless the work is approved.\n\n")
+	}
 
 	b.WriteString("## Details\n\n")
 	if strings.TrimSpace(q.Details()) == "" {
@@ -167,12 +189,32 @@ func renderQuest(id uint64) string {
 	return b.String()
 }
 
+// step is one possible move on a quest page.
+type step struct{ text, fn string }
+
+func closeStep() step {
+	return step{"**Close quest**: the poster stops the quest. No coins move now; the builder keeps their turn, and if it ends without approval the reward goes back to the poster. It cannot be undone.", "CancelQuest"}
+}
+
+// reviewWarning is shown to posters on the home and help pages.
+func reviewWarning() string {
+	return "> [!WARNING]\n> **Posters: check your quest.** If you do not approve or reject a submission within the review window (" +
+		approx(escrow.ReviewBlocks) + "), the builder is paid automatically.\n\n"
+}
+
+// questState is the state as shown in tables and on the quest page.
+func questState(q *escrow.Quest) string {
+	if q.Closing() && !q.State().IsFinal() {
+		return stateText(q.State()) + ", closing"
+	}
+	return stateText(q.State())
+}
+
 // nextSteps lists the moves valid in q's state, who may make each, and a
 // transaction link and gnokey command for each.
 func nextSteps(q *escrow.Quest, h int64) string {
 	id := idStr(q.ID())
 	var b strings.Builder
-	type step struct{ text, fn string }
 	var steps []step
 	switch q.State() {
 	case escrow.Open:
@@ -184,16 +226,34 @@ func nextSteps(q *escrow.Quest, h int64) string {
 		if h <= q.WorkDeadline() {
 			steps = append(steps, step{"**Submit work**: the builder sends a link to the work (starting with `https://`), until block " + blocksStr(q.WorkDeadline()) + ".", "SubmitWork"})
 		}
-		steps = append(steps, step{"**Unclaim**: the builder gives the quest back so others can take it.", "UnclaimQuest"})
+		if q.Closing() {
+			steps = append(steps, step{"**Unclaim**: the builder gives the quest back. It is closing, so it ends and the reward goes back to the poster.", "UnclaimQuest"})
+		} else {
+			steps = append(steps, step{"**Unclaim**: the builder gives the quest back so others can take it.", "UnclaimQuest"})
+			steps = append(steps, closeStep())
+		}
 		if q.CanRelease(h) {
-			steps = append(steps, step{"**Release**: the work deadline has passed without a submission, so anyone can reopen the quest.", "ReleaseQuest"})
+			if q.Closing() {
+				steps = append(steps, step{"**Release**: the work deadline has passed without a submission, so anyone can end the quest; the reward goes back to the poster.", "ReleaseQuest"})
+			} else {
+				steps = append(steps, step{"**Release**: the work deadline has passed without a submission, so anyone can reopen the quest.", "ReleaseQuest"})
+			}
+		} else if q.Closing() {
+			b.WriteString("If nothing is submitted by block " + blocksStr(q.WorkDeadline()) + ", anyone can end the quest from block " + blocksStr(q.WorkDeadline()+1) + " and the reward goes back to the poster.\n\n")
 		} else {
 			b.WriteString("If nothing is submitted by block " + blocksStr(q.WorkDeadline()) + ", anyone can release the quest from block " + blocksStr(q.WorkDeadline()+1) + ".\n\n")
 		}
 	case escrow.Submitted:
 		steps = append(steps, step{"**Approve**: the poster accepts the work and the builder is paid " + gnotStr(q.Reward()) + " GNOT.", "ApproveWork"})
 		if h <= q.ReviewDeadline() {
-			steps = append(steps, step{"**Reject**: the poster refuses the work with a reason, until block " + blocksStr(q.ReviewDeadline()) + ". The quest opens again.", "RejectWork"})
+			if q.Closing() {
+				steps = append(steps, step{"**Reject**: the poster refuses the work with a reason, until block " + blocksStr(q.ReviewDeadline()) + ". The quest is closing, so it ends and the reward goes back to the poster.", "RejectWork"})
+			} else {
+				steps = append(steps, step{"**Reject**: the poster refuses the work with a reason, until block " + blocksStr(q.ReviewDeadline()) + ". The quest opens again.", "RejectWork"})
+			}
+		}
+		if !q.Closing() {
+			steps = append(steps, closeStep())
 		}
 		if q.CanClaimPayout(h) {
 			steps = append(steps, step{"**Claim payout**: the poster did not answer in time, so the builder can take the reward.", "ClaimPayout"})
@@ -203,7 +263,7 @@ func nextSteps(q *escrow.Quest, h int64) string {
 	case escrow.Paid:
 		return "Nothing: this quest is finished and the builder was paid " + gnotStr(q.Reward()) + " GNOT.\n\n"
 	case escrow.Cancelled:
-		return "Nothing: the poster cancelled this quest and got the reward back.\n\n"
+		return "Nothing: this quest was cancelled and the reward went back to the poster.\n\n"
 	}
 	for _, s := range steps {
 		b.WriteString("- " + s.text + " [Open in gnoweb](" + txLink(s.fn).AddArgs("id", id).URL() + ")\n")
@@ -264,7 +324,7 @@ func renderUser(addr address, asPoster bool, page int) string {
 		if who != "" {
 			whoText = userLink(who, !asPoster)
 		}
-		b.WriteString("| " + idStr(id) + " | " + questLink(q) + " | " + gnotStr(q.Reward()) + " GNOT | " + stateText(q.State()) + " | " + whoText + " |\n")
+		b.WriteString("| " + idStr(id) + " | " + questLink(q) + " | " + gnotStr(q.Reward()) + " GNOT | " + questState(q) + " | " + whoText + " |\n")
 	}
 	b.WriteString("\n" + nav)
 	return b.String()
@@ -303,10 +363,12 @@ func renderHelp() string {
 	b.WriteString("- **gnokey**: the commands below, already set for Onyx. Replace `KEY` with your key name and `ID` with the quest number.\n\n")
 	b.WriteString("Only direct calls from a wallet are accepted (not calls from other realms or `maketx run` scripts). Only `PostQuest` takes coins; every other call must send none.\n\n")
 
+	b.WriteString(reviewWarning())
 	b.WriteString("## Post a quest\n\n")
 	b.WriteString("Send the reward with the call: exactly one coin, in `ugnot`, at least " + gnotStr(MinReward) + " GNOT (1 GNOT = 1000000 ugnot). " +
 		"Arguments: title (up to " + strconv.Itoa(escrow.MaxTitleLen) + " characters, one line), details (up to " + strconv.Itoa(escrow.MaxDetailsLen) +
 		" characters), work window in blocks (" + blocksStr(escrow.MinWorkBlocks) + " to " + blocksStr(escrow.MaxWorkBlocks) + "). " +
+		"Anyone except you can claim your quest while it is open; once it is claimed, closing it (below) stops new claims. " +
 		"Posting also stores the quest on chain. The chain charges a storage deposit for that, paid by the poster on top of the reward: " +
 		"about 0.65 GNOT for a new quest at the default price of 100 ugnot per byte (measured on a local node). It is held by the chain, not by this realm, and is not part of the escrow; when a later call makes the stored data smaller, the chain returns that share to whoever made the call.\n\n")
 	b.WriteString("With gnoweb, pick a reward: " + postLinks() + ". The form shows the amount and asks you to confirm adding the coins. " +
@@ -317,10 +379,10 @@ func renderHelp() string {
 		{"Claim a quest", "Anyone except the poster. The work window starts now.", "ClaimQuest", ""},
 		{"Submit work", "The builder only, until the work deadline. The link must start with `https://`.", "SubmitWork", "https://link-to-your-work"},
 		{"Approve work", "The poster only. The builder is paid at once.", "ApproveWork", ""},
-		{"Reject work", "The poster only, until the review deadline. The quest opens again; the reason and the reject count are public.", "RejectWork", "What is missing"},
-		{"Cancel a quest", "The poster only, while the quest is open. The reward is refunded.", "CancelQuest", ""},
-		{"Unclaim a quest", "The builder only, before submitting. The quest opens again.", "UnclaimQuest", ""},
-		{"Release a quest", "Anyone, once the work deadline has passed without a submission. The quest opens again.", "ReleaseQuest", ""},
+		{"Reject work", "The poster only, until the review deadline. The quest opens again (or, if you closed it, ends with a refund to you); the reason and the reject count are public.", "RejectWork", "What is missing"},
+		{"Cancel or close a quest", "The poster only. An open quest is cancelled at once and the reward is refunded. A claimed or submitted quest is closed instead: no coins move now, the builder keeps their turn, and the reward goes back to you when that turn ends without approval (the builder unclaims, the work deadline passes and anyone releases it, or you reject the work). Nobody can claim it again. Closing cannot be undone.", "CancelQuest", ""},
+		{"Unclaim a quest", "The builder only, before submitting. The quest opens again (or, if the poster closed it, ends with a refund to the poster).", "UnclaimQuest", ""},
+		{"Release a quest", "Anyone, once the work deadline has passed without a submission. The quest opens again (or, if the poster closed it, ends with a refund to the poster).", "ReleaseQuest", ""},
 		{"Claim a timeout payout", "The builder only, once the review deadline has passed without an answer from the poster.", "ClaimPayout", ""},
 	}
 	for _, s := range sections {
@@ -439,7 +501,7 @@ func gnokeyCall(fn, id, arg, send string) string {
 	if send != "" {
 		cmd += " -send \"" + send + "\""
 	}
-	return cmd + " -gas-fee 1000000ugnot -gas-wanted 50000000 -broadcast -chainid " + chainID + " -remote " + chainRPC + " KEY"
+	return cmd + " -gas-fee 100000ugnot -gas-wanted 10000000 -broadcast -chainid " + chainID + " -remote " + chainRPC + " KEY"
 }
 
 // QuestMaster runs on the Onyx test network only; every example command
