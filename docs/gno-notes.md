@@ -203,3 +203,68 @@ Other facts:
   to copy and distribute verbatim copies" sentence, but its section "How to Apply These Terms to Your New Programs"
   invites other authors to license their programs under it; our LICENSE follows that section. This is our reading,
   not legal advice.
+
+## Hardening after the security review (task 5)
+
+### Closing a claimed or submitted quest
+
+`CancelQuest` on a Claimed or Submitted quest marks it closing (`escrow.Quest.Closing()`, `QuestView.Closing`) and
+moves no coins; a second call fails with "escrow: the quest is already closing". While closing, the current builder
+keeps every right (submit until the work deadline, approval, timeout payout), and every move that would reopen the
+quest (Unclaim, Release after the work deadline, Reject) ends it instead: Cancelled, with a RefundPoster payout that
+the realm sends in the same call. In `p/escrow`, `Unclaim`, `Release` and `Reject` now return `(Payout, error)`; a
+zero Payout (`Due() == false`) means no transfer. A non-zero Payout is only returned together with a move into a
+final state, and `cancel()` is the only place that builds a refund. Events: `QuestClosing` (id, actor);
+`QuestCancelled` now carries `how` = `open`, `unclaimed`, `released` or `rejected`.
+
+### Review window
+
+`ReviewBlocks` is 172,800 (7 days at 3.5 s; 6.8 days at Onyx's measured 3.42 s). The home and help pages warn
+posters that a silent poster pays any submission after the window.
+
+### Escaping additions
+
+The sanitizer does not escape `$`, and gnoweb renders `$…$` and `$$…$$` as math; every user-text helper now turns
+`$` into `\$`. gnoweb's mention parser links an address after a space, and the realm itself puts a space before user
+text in headings (`# Quest 1: `), table cells and quote lines, so a `g1` at the start of user text becomes
+`&#103;1`. Both were checked in gnoweb's real HTML (stage 9 of `scripts/local-flow.sh`): no `<math>`, no `/u/g1`
+link, and the text shows as typed.
+
+### Two messages in one transaction
+
+Stage 10 of `scripts/local-flow.sh` sends one (unsigned genesis) transaction with two `PostQuest` messages, sending
+2 and 3 GNOT. Each quest stored its own reward and the realm received exactly 5 GNOT: `unsafe.OriginSend()` is per
+message.
+
+### ugnot restrictions
+
+`params/bank:p:restricted_denoms` read on 2026-11-23: `[]` on Onyx and `[]` on mainnet (`gnoland-1`, read-only, for
+reference only). If a network lists `ugnot` there, realm payouts (bank transfers) would not go through and freed
+storage deposits would go to the storage fee collector.
+
+### Where the storage deposit of a quest goes
+
+Measured with filetests (`storage: +N bytes`) on variants of the realm with one index removed at a time; posts by
+the same poster after the first; 100 ugnot per byte on Onyx.
+
+| Part | Bytes per post | GNOT per post |
+|---|---|---|
+| The quest object (`escrow.Quest`, with title and details) and its node in `quests` | about 3,600 | about 0.36 |
+| Its entry in `openIDs` | about 2,000 | about 0.20 |
+| Its entry in the poster's `byPoster` tree | about 2,000 | about 0.20 |
+| Total per post | about 7,600 | about 0.76 |
+| Once per new poster: the poster's own index tree | about 1,800 | about 0.18 |
+| Text | about 1 per character | 0.0001 per character |
+
+A first claim by a builder costs about 1,900 bytes (their `byBuilder` tree); later claims are about neutral, because
+the new `byBuilder` entry replaces the removed `openIDs` entry.
+
+Cheapest reductions (not done; estimates from the table):
+
+1. Keep each user's quest ids in a `[]uint64` inside one struct per user instead of an avl tree per user: about
+   8 bytes per id instead of about 2,000, and no 1,800-byte tree per new user. Saves about 0.20 GNOT per post and
+   0.18 GNOT per new poster or builder. Cost: every append rewrites the slice (gas grows with the user's number of
+   quests).
+2. Drop `openIDs` and find open quests by scanning `quests` from the newest: saves about 0.20 GNOT per post. Cost:
+   the home page reads more quests when many are closed, so `Render` gets slower as the board grows.
+3. Do both: about 0.36 to 0.40 GNOT per post instead of about 0.76.

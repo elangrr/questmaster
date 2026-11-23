@@ -30,12 +30,12 @@ the wait out afterwards.
 | 0:50 | Quest page | Open the quest. Point at "What can happen next". | "Every quest page shows only the moves that are possible now, and who may make them." |
 | 0:55 | Quest page | Switch Adena to **Builder**. Click "Open in gnoweb" next to Claim, sign. | "Now I'm the builder. I claim the quest. The work window starts now." |
 | 1:05 | Quest page | Reload. Click "Open in gnoweb" next to Submit work, paste the link, sign. | "I've done the work, so I submit a link to it." |
-| 1:15 | Quest page | Reload. Point at State "Submitted" and the review deadline. | "The poster now has about 3 days to approve or reject. If they never answer, the builder can claim the reward after that." |
+| 1:15 | Quest page | Reload. Point at State "Submitted" and the review deadline. | "The poster now has about 7 days to approve or reject. If they never answer, the builder can claim the reward after that, so the board warns posters to check their quests." |
 | 1:20 | Quest page | Switch Adena to **Poster**. Click Approve, sign. | "Back as the poster. The work is good, so I approve." |
 | 1:30 | Adena, Builder account | Show the Builder's balance. | "The builder received exactly 5 GNOT, paid by the realm." |
 | 1:40 | Paid page | Open "Paid quests". | "The Paid page lists every quest the board has paid, as public proof." |
 | 1:50 | Home page, then a second open quest | As **Poster**, open the other open quest, click Cancel, sign. | "A poster can also cancel an open quest. The reward comes straight back." |
-| 2:00 | Help page, "Claim a timeout payout" | Scroll to the rules. | "Two deadlines keep things fair: if a builder stalls, anyone can release the quest; if a poster stays silent, the builder gets paid." |
+| 2:00 | Help page, "Cancel or close a quest" | Scroll to the rules. | "Two deadlines keep things fair: if a builder stalls, anyone can release the quest; if a poster stays silent, the builder gets paid. And if someone grabs a quest and sits on it, the poster can close it: the reward comes back when that builder's turn ends." |
 | 2:15 | Terminal | Run `gno test ./...` and let it finish. | "The escrow rules are a separate package that other realms can import. There is no admin function: nobody can move the locked GNOT except through these rules. All of it is tested." |
 | 2:35 | Browser, `p/escrow` source on gnoweb | Show the package page. | "The package is on chain for anyone to use." |
 | 2:40 | Home page | End on the board. | "That's QuestMaster. The links are in the README. Thanks for watching." |
