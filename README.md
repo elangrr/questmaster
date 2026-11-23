@@ -4,11 +4,12 @@ QuestMaster is a bounty board for small tasks, paid in GNOT, running on Gno.land
 
 > **Status: Onyx testnet (`onyx-1`), test GNOT only.** Nothing here uses real money.
 >
-> - Live board: `TODO-DEPLOY: realm URL` (https://onyx.testnets.gno.land/r/NAMESPACE/questmaster)
-> - Escrow package: `TODO-DEPLOY: package URL` (https://onyx.testnets.gno.land/p/NAMESPACE/escrow)
+> - Live board: https://onyx.testnets.gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster (live once the deploy is approved on Onyx)
+> - Escrow package: https://onyx.testnets.gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow
 > - Example quest: `TODO-DEPLOY: quest page URL`
 > - Example transactions on GnoScan: `TODO-DEPLOY: post tx`, `TODO-DEPLOY: approve tx`, `TODO-DEPLOY: cancel tx`
 > - Demo video: `TODO-DEPLOY: video URL`
+> - Source: https://github.com/elangrr/questmaster
 
 Contents: [Tour](#a-one-minute-tour) · [How to use it](#how-to-use-it) · [Rules](#the-rules) · [Costs](#what-it-costs) · [Safety](#safety) · [Use the escrow in your realm](#using-pescrow-in-your-own-realm) · [Run it locally](#run-it-locally) · [Layout and roadmap](#project-layout) · [Licence](#licence-and-credits)
 
@@ -73,17 +74,17 @@ First get test GNOT: open https://faucet.gno.land, choose the **Onyx Faucet**, p
 ### With gnoweb and a browser wallet
 
 1. Install a Gno.land wallet such as [Adena](https://www.adena.app) and switch it to the Onyx network.
-2. Open the board (`TODO-DEPLOY: realm URL`).
+2. Open the board: https://onyx.testnets.gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster
 3. **Post**: click one of the reward links (1, 5 or 10 GNOT). gnoweb opens a form for `PostQuest` with the reward filled in. It shows "This transaction link is requesting … from your balance"; turn on the switch to add the coins, fill in the title, details and work window in blocks, and sign with your wallet. For another amount, change `.send=` in the link, or use gnokey.
 4. **Everything else**: open a quest page. Under "What can happen next" each possible move has an "Open in gnoweb" link that opens the form with the quest number filled in. Sign it with your wallet. These calls take no coins.
 
 ### With gnokey
 
-Every command below targets Onyx. Replace `KEY` with your key name and `ID` with the quest number. The realm path is `gno.land/r/NAMESPACE/questmaster` (`TODO-DEPLOY: namespace`).
+Every command below targets Onyx. Replace `KEY` with your key name and `ID` with the quest number. The realm path is `gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster`.
 
 ```sh
 # Post a quest with a 5 GNOT reward and a 20,000-block work window (about 19 hours)
-gnokey maketx call -pkgpath "gno.land/r/NAMESPACE/questmaster" -func "PostQuest" \
+gnokey maketx call -pkgpath "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster" -func "PostQuest" \
   -args "Fix a typo in the docs" -args "Details of the task" -args "20000" -send "5000000ugnot" \
   -gas-fee 100000ugnot -gas-wanted 10000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
 
@@ -96,15 +97,15 @@ gnokey maketx call -pkgpath "gno.land/r/NAMESPACE/questmaster" -func "PostQuest"
 #   -func "UnclaimQuest" -args "ID"                                  the builder
 #   -func "ReleaseQuest" -args "ID"                                  anyone, after the work deadline
 #   -func "ClaimPayout"  -args "ID"                                  the builder, after the review deadline
-gnokey maketx call -pkgpath "gno.land/r/NAMESPACE/questmaster" -func "ClaimQuest" -args "ID" \
+gnokey maketx call -pkgpath "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster" -func "ClaimQuest" -args "ID" \
   -gas-fee 100000ugnot -gas-wanted 10000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
 ```
 
 Read the state without a transaction:
 
 ```sh
-gnokey query vm/qeval -data 'gno.land/r/NAMESPACE/questmaster.GetQuest(1)' -remote https://rpc.onyx.testnets.gno.land:443
-gnokey query vm/qeval -data 'gno.land/r/NAMESPACE/questmaster.GetTotals()' -remote https://rpc.onyx.testnets.gno.land:443
+gnokey query vm/qeval -data 'gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.GetQuest(1)' -remote https://rpc.onyx.testnets.gno.land:443
+gnokey query vm/qeval -data 'gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.GetTotals()' -remote https://rpc.onyx.testnets.gno.land:443
 ```
 
 ## The rules
@@ -188,7 +189,7 @@ import (
 	"strconv"
 
 	"gno.land/p/nt/avl/v0"
-	"gno.land/p/NAMESPACE/escrow"
+	"gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow"
 )
 
 var (
@@ -258,7 +259,7 @@ Toolchain: gno **v1.8.0** (commit `fc79041f4cd1`), the version Onyx runs. Build 
 ```sh
 gno test ./...                 # all tests: escrow, realm, pages, golden pages, events, the README example
 gno lint ./... && gno fmt -diff ./...
-gnodev local .                 # local chain and gnoweb at http://127.0.0.1:8888/r/questmaster_dev/questmaster
+gnodev local .                 # local chain and gnoweb at http://127.0.0.1:8888/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster
 scripts/local-flow.sh          # full flow on a real local node, no keys needed (see below)
 ```
 
@@ -284,7 +285,7 @@ Events on every change, for indexers: `QuestPosted`, `QuestClaimed`, `QuestUncla
 
 ## Roadmap
 
-- Smaller storage per quest, to lower the posting deposit.
+- Smaller storage per quest: per-user id lists instead of one tree per user, and no separate open-quest index, would cut the posting deposit from about 0.76 to about 0.4 GNOT.
 - A simple dispute step (for example a neutral reviewer chosen at post time) instead of the poster alone deciding.
 - Optional rewards in GRC20 tokens.
 - Calls from other realms and DAOs, so a DAO can post and pay quests.

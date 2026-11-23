@@ -1,158 +1,170 @@
 # Deploying QuestMaster to Onyx
 
-A checklist for the owner, with a key made only for this hackathon. Every command targets the Onyx test
-network (`onyx-1`, `https://rpc.onyx.testnets.gno.land:443`) and uses test GNOT. Never point these
-commands at another network.
+For the owner, with the hackathon-only key `questmaster-deploy` in its own keybase. Every command is copy-paste
+ready and targets the Onyx test network only (`onyx-1`, `https://rpc.onyx.testnets.gno.land:443`, test GNOT).
 
-Values used below (read from Onyx on 2026-11-23, see `docs/gno-notes.md`):
-
-- Gas price 1 ugnot per 1,000 gas. Calls: `-gas-wanted 10000000 -gas-fee 100000ugnot`. Deploys:
-  `-gas-wanted 100000000 -gas-fee 1000000ugnot`.
-- Storage deposit 100 ugnot per byte. Each deploy: `-max-deposit 30000000ugnot` (30 GNOT cap; about 4 to 7 GNOT
-  expected).
-- New packages are **parked** until the network's package approver (gpao) enables them. Plan for waiting.
-
-## 1. Key and funds (owner only)
+- Deploy address and namespace: `g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8`
+- Escrow package: `gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow`
+- Realm: `gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster`
 
 This server also runs a node. **Never use, list or touch the server's existing keys or key folders** (the default
-gnokey home, `~/.config/gno`, or any validator or node key). Every gnokey command in this file uses its own keybase
-with `-home "$HOME/.gno-questmaster"`, which holds only the hackathon key. Creating the key in Adena or on another
-machine instead is equally fine; then use that wallet's address below.
+gnokey home `~/.config/gno`, or any validator or node key). Every command below passes
+`-home "$HOME/.gno-questmaster"`, the keybase that holds only `questmaster-deploy`.
 
-1. Create a new key used only for this hackathon, in its own keybase. The seed phrase is shown once: write it down
-   offline and never paste it into a chat, a file in this repo, or a bot.
-   ```sh
-   gnokey add -home "$HOME/.gno-questmaster" questmaster-deploy
-   gnokey list -home "$HOME/.gno-questmaster"     # shows only this keybase: note the g1 address
-   ```
-2. Make a second wallet for the demo builder (for example in Adena), also test-only.
-3. Fund both from https://faucet.gno.land, "Onyx Faucet" (100, 200 or 300 test GNOT per request). The deploy key
-   needs about 20 GNOT (deposits and fees) plus the rewards you plan to post.
-   ```sh
-   gnokey query -home "$HOME/.gno-questmaster" bank/balances/<g1-address> -remote https://rpc.onyx.testnets.gno.land:443
-   ```
+Run everything from the repository root, on the branch that has the final code. Use gnokey from gno v1.8.0.
 
-## 2. Choose the namespace
-
-Either is fine; the address is simplest.
-
-- **Your address**: `gno.land/p/<g1-address>/escrow` and `gno.land/r/<g1-address>/questmaster`. Nothing to register.
-  Check: `gnokey query -home "$HOME/.gno-questmaster" vm/qeval -data 'gno.land/r/sys/names.IsAuthorizedAddressForNamespace(address("<g1-address>"), "<g1-address>")' -remote https://rpc.onyx.testnets.gno.land:443` must print `(true bool)`.
-- **A name** such as `nym-fluxen123`: free on Onyx. Format `nym-<5 to 13 lowercase letters><3 digits>`, stem not
-  starting with gno, gl, atom, atone, photon or cosmos. Register it from the deploy key with the "Click here to
-  register" link on https://onyx.testnets.gno.land/r/sys/namereg/v0 (function `Register`), then run the same
-  `IsAuthorizedAddressForNamespace` check with the name.
-
-## 3. Replace the placeholder namespace
-
-The code uses the placeholder `questmaster_dev`. It appears in:
-
-| File | What |
-|---|---|
-| `p/escrow/gnomod.toml` | `module = "gno.land/p/questmaster_dev/escrow"` |
-| `p/escrow/z_example_filetest.gno` | the escrow import in the README example |
-| `r/questmaster/gnomod.toml` | `module = "gno.land/r/questmaster_dev/questmaster"` |
-| `r/questmaster/questmaster.gno`, `render.gno` | the escrow import (and a comment) |
-| `r/questmaster/questmaster_test.gno`, `render_test.gno` | the escrow import, the realm path and address in tests |
-| `r/questmaster/filetests/z_events_filetest.gno`, `z_pages_filetest.gno` | the realm import, path and expected output |
-| `scripts/local-flow.sh` | the realm path for the local flow |
-
-One command does all of it and reruns the tests (it only edits files; it never calls gnokey):
+## 0. Before deploying
 
 ```sh
-GNOHOME=$HOME/.gno-builder scripts/set-namespace.sh <g1-address or nym-name>
-grep -rn questmaster_dev p r scripts/local-flow.sh    # must print nothing
+# The code is final: tests, lint and the local real-node flow all pass.
+GNOHOME=$HOME/.gno-builder gno test ./... && GNOHOME=$HOME/.gno-builder gno lint ./... && scripts/local-flow.sh
+
+# The key's address and balance (about 300 GNOT; the two deploys need about 15).
+gnokey list -home "$HOME/.gno-questmaster"
+gnokey query -home "$HOME/.gno-questmaster" bank/balances/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8 \
+  -remote https://rpc.onyx.testnets.gno.land:443
 ```
 
-Also replace `NAMESPACE` in `README.md` (`grep -n NAMESPACE README.md`).
+## What leaves the wallet
 
-Set the source link shown in every page's footer: in `r/questmaster/render.gno`, change
-`const SourceRepo = "TODO-DEPLOY: source repository URL"` to the public repository URL (starting with `https://`).
-Then regenerate the golden pages and rerun the tests:
+Onyx today: gas price 1 ugnot per 1,000 gas, storage 100 ugnot per byte. The gas fee you set is charged in full,
+whatever gas is used.
+
+| Step | Gas needed (estimate) | Gas wanted / fee set below | Storage deposit (measured locally) | Total out of the wallet |
+|---|---|---|---|---|
+| addpkg p/escrow | about 61 million: 1,250 gas per byte of the 46.7 KB of `.gno` files (charged at submit under Onyx's "inert" policy) plus transaction size | 100,000,000 / 1 GNOT | about 3.8 GNOT (38,205 bytes), taken when the package is enabled | about 4.8 GNOT |
+| addpkg r/questmaster | about 164 million (125.9 KB of `.gno` files) | 250,000,000 / 1 GNOT | about 7.8 GNOT (77,696 bytes), taken when the package is enabled | about 8.8 GNOT |
+| Each demo call | under 3 million | 10,000,000 / 0.1 GNOT | posting about 0.65 to 0.8 GNOT; others 0 to 0.3 | fee + deposit (+ the reward when posting) |
+
+The deposit is capped by `-max-deposit 30000000ugnot` (30 GNOT) per package. It is taken from this address when the
+network's approver enables the package, so keep at least 15 GNOT in the wallet until both packages are live.
+
+Optional dry run: add `-simulate only` to an addpkg command below. It signs and simulates without broadcasting and
+prints the gas used, so you can check the estimate first. Nothing is sent.
+
+## (a) Deploy the escrow package
 
 ```sh
-GNOHOME=$HOME/.gno-builder gno test -update-golden-tests ./r/questmaster/ && GNOHOME=$HOME/.gno-builder gno test ./...
-git diff r/questmaster/filetests    # only the footer line should change
-```
-
-Commit the change on a branch.
-
-## 4. Deploy the escrow package, wait until it is live
-
-```sh
-gnokey maketx addpkg -home "$HOME/.gno-questmaster" -pkgpath "gno.land/p/<ns>/escrow" -pkgdir ./p/escrow \
+gnokey maketx addpkg -home "$HOME/.gno-questmaster" \
+  -pkgpath "gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow" -pkgdir ./p/escrow \
   -max-deposit 30000000ugnot -gas-fee 1000000ugnot -gas-wanted 100000000 \
   -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 questmaster-deploy
 ```
 
-Note the transaction hash it prints. Then check the status until it says `"status":"live"`:
+It uploads `escrow.gno`, `escrow_test.gno`, `z_example_filetest.gno` and `gnomod.toml`. Note the transaction hash it
+prints (for the README).
+
+## (b) Wait until the escrow is live
 
 ```sh
-gnokey query -home "$HOME/.gno-questmaster" vm/qpkgmeta_json -data "gno.land/p/<ns>/escrow" -remote https://rpc.onyx.testnets.gno.land:443
+gnokey query -home "$HOME/.gno-questmaster" vm/qpkgmeta_json \
+  -data "gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow" -remote https://rpc.onyx.testnets.gno.land:443
 ```
 
-`"status":"inert"` with "waiting for a package approver to enable it" means it is parked. On 2026-11-23 Onyx had 68
-parked packages, some for a long time, so do this early (days before the deadline, not hours). If it stays parked,
-ask in the Gno.land Discord. Do not deploy the realm before the escrow is live: the approver resolves imports from
-the chain, so the realm would fail its check.
+- Parked, waiting for approval:
+  `{"path":"gno.land/p/g1llc…/escrow","status":"inert","creator":"g1llc…","height":…,"max_deposit":"30000000ugnot","reason":"waiting for a package approver to enable it","pending":true}`
+- Enabled: `{"path":"gno.land/p/g1llc…/escrow","status":"live",…}`
+- Not submitted (yet): `{"path":"…","status":"absent"}`
+- Any other reason (for example a failed type check) means it will not be enabled: see "If a bug is found" below.
 
-## 5. Deploy the realm, wait until it is live
+On 2026-11-23 Onyx had 68 parked packages, some for a long time. Check every few minutes; if it stays parked for
+hours, ask in the Gno.land Discord. All parked packages:
+`gnokey query -home "$HOME/.gno-questmaster" vm/qinertpaths -remote https://rpc.onyx.testnets.gno.land:443`
+
+**Do not submit the realm before the escrow is live**: the approver resolves the realm's imports from the chain, so
+it would fail its check.
+
+## (c) Deploy the realm (only after the escrow is live)
 
 ```sh
-gnokey maketx addpkg -home "$HOME/.gno-questmaster" -pkgpath "gno.land/r/<ns>/questmaster" -pkgdir ./r/questmaster \
-  -max-deposit 30000000ugnot -gas-fee 1000000ugnot -gas-wanted 100000000 \
+gnokey maketx addpkg -home "$HOME/.gno-questmaster" \
+  -pkgpath "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster" -pkgdir ./r/questmaster \
+  -max-deposit 30000000ugnot -gas-fee 1000000ugnot -gas-wanted 250000000 \
+  -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 questmaster-deploy
+```
+
+It uploads `escape.gno`, `questmaster.gno`, `render.gno`, `questmaster_test.gno`, `render_test.gno`, `gnomod.toml`
+and the two files in `filetests/`. Note the transaction hash.
+
+## (d) Wait until the realm is live, then check it
+
+```sh
+gnokey query -home "$HOME/.gno-questmaster" vm/qpkgmeta_json \
+  -data "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster" -remote https://rpc.onyx.testnets.gno.land:443
+
+gnokey query -home "$HOME/.gno-questmaster" vm/qeval \
+  -data 'gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.GetTotals()' \
+  -remote https://rpc.onyx.testnets.gno.land:443
+```
+
+Then open https://onyx.testnets.gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster and check: the
+home page shows zero totals; "Help and commands", "Paid quests" and the footer's [source] link work; the help page
+shows `-pkgpath "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"`. (The realm records its own path
+when it is enabled; if links showed an empty path, stop and report it.)
+
+## (e) The first calls for the demo
+
+The poster is `questmaster-deploy`; the builder is a second test wallet (Adena), funded from the Onyx Faucet.
+
+```sh
+# 1. Post a quest with a 5 GNOT reward and a 20,000-block work window (about 19 hours).
+gnokey maketx call -home "$HOME/.gno-questmaster" \
+  -pkgpath "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster" -func "PostQuest" \
+  -args "Translate the README to Indonesian" -args "Keep the headings. Use plain words." -args "20000" \
+  -send "5000000ugnot" -gas-fee 100000ugnot -gas-wanted 10000000 \
   -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 questmaster-deploy
 
-gnokey query -home "$HOME/.gno-questmaster" vm/qpkgmeta_json -data "gno.land/r/<ns>/questmaster" -remote https://rpc.onyx.testnets.gno.land:443
+# 2. Builder (in Adena): open the quest page, "Open in gnoweb" next to Claim, sign; then Submit work with a link.
+
+# 3. Approve as the poster (replace 1 with the quest number):
+gnokey maketx call -home "$HOME/.gno-questmaster" \
+  -pkgpath "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster" -func "ApproveWork" -args "1" \
+  -gas-fee 100000ugnot -gas-wanted 10000000 \
+  -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 questmaster-deploy
+
+# 4. A second quest, cancelled, to show the refund:
+gnokey maketx call -home "$HOME/.gno-questmaster" \
+  -pkgpath "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster" -func "PostQuest" \
+  -args "Old idea" -args "" -args "20000" -send "1000000ugnot" -gas-fee 100000ugnot -gas-wanted 10000000 \
+  -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 questmaster-deploy
+gnokey maketx call -home "$HOME/.gno-questmaster" \
+  -pkgpath "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster" -func "CancelQuest" -args "2" \
+  -gas-fee 100000ugnot -gas-wanted 10000000 \
+  -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 questmaster-deploy
 ```
 
-### Checking approval status
+Check: the builder's balance went up by exactly 5 GNOT; `GetTotals()` shows Paid 5000000 and Refunded 1000000.
+Then follow `docs/demo-script.md` for the recording (one paid quest must exist first, which step 3 gives you).
 
-`gnokey query -home "$HOME/.gno-questmaster" vm/qpkgmeta_json -data "<package path>" -remote https://rpc.onyx.testnets.gno.land:443`
+## Record the links
 
-- `"status":"live"`: enabled; it can be used and imported.
-- `"status":"inert"` with `"pending":true` and "waiting for a package approver to enable it": parked, not yet approved.
-- Any other reason in that output explains why it cannot be enabled (for example a failed typecheck): fix the code
-  and deploy to a **new** path (see below).
+Fill the remaining `TODO-DEPLOY` items in `README.md` (`grep -n TODO-DEPLOY README.md`):
 
-You can also list all parked packages: `gnokey query -home "$HOME/.gno-questmaster" vm/qinertpaths -remote https://rpc.onyx.testnets.gno.land:443`.
-
-## 6. Check it on gnoweb
-
-- https://onyx.testnets.gno.land/r/<ns>/questmaster shows the home page with zero totals.
-- The links "Help and commands" and "Paid quests" work; the help page shows `-pkgpath "gno.land/r/<ns>/questmaster"`.
-- `gnokey query -home "$HOME/.gno-questmaster" vm/qeval -data 'gno.land/r/<ns>/questmaster.GetTotals()' -remote https://rpc.onyx.testnets.gno.land:443`
-
-## 7. One full quest with two wallets
-
-Follow `docs/demo-script.md` (it is the same flow): the deploy key posts with 5 GNOT, the builder wallet claims and
-submits a link, the poster approves. Check that the builder's balance went up by exactly 5 GNOT and that
-`GetTotals()` shows Locked 0 and Paid 5000000. Also post a second quest and cancel it, to show the refund.
-
-## 8. Record the links
-
-Fill every `TODO-DEPLOY` in `README.md` (`grep -rn TODO-DEPLOY .`):
-
-- Realm: `https://onyx.testnets.gno.land/r/<ns>/questmaster`
-- Package: `https://onyx.testnets.gno.land/p/<ns>/escrow`
-- A quest: `https://onyx.testnets.gno.land/r/<ns>/questmaster:quest/1`
+- A quest: `https://onyx.testnets.gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster:quest/1`
 - Transactions on GnoScan: `https://gnoscan.io/transactions/details?txhash=<hash>&chainId=onyx-1`
-- Accounts on GnoScan: `https://gnoscan.io/account/<g1-address>?chainId=onyx-1`
-- The realm on GnoScan: `https://gnoscan.io/realms/details?path=gno.land/r/<ns>/questmaster&chainId=onyx-1`
+- The realm on GnoScan: `https://gnoscan.io/realms/details?path=gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster&chainId=onyx-1`
+- The deploy account on GnoScan: `https://gnoscan.io/account/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8?chainId=onyx-1`
+- The demo video
 
 The GnoScan URL forms come from the site's own routes; open each once to make sure it shows Onyx data.
 
 ## If a bug is found after deploying
 
-A deployed package cannot be changed or replaced at the same path, and a parked one should not be re-submitted either
+A deployed package cannot be changed or replaced at the same path, and a parked one should not be re-submitted
 (an approval names the exact source). Never try to reuse a path. Instead:
 
-1. Fix the code and run all tests and `scripts/local-flow.sh` again.
-2. Deploy to new paths, for example `gno.land/p/<ns>/escrow/v2` and `gno.land/r/<ns>/questmaster2`: change the two
-   `gnomod.toml` module lines, the escrow import in `r/questmaster` (and its tests and the README example), and the
-   realm path in the tests, filetests and `scripts/local-flow.sh`; `grep -rn "questmaster_dev\|<ns>/escrow\|<ns>/questmaster" .`
-   finds them. Run the tests again.
-3. Deploy the new escrow, wait until it is live, then the new realm (sections 4 and 5).
-4. The old realm keeps working with whatever it holds: open quests there can still be finished or cancelled by their
-   posters. Point the README and the demo at the new realm, and say on the old one's quests (if any) where the new
-   board is.
+1. Fix the code; run all tests and `scripts/local-flow.sh` again.
+2. Move to new paths, for example `gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow/v2` and
+   `gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster2`: change the two `gnomod.toml` module lines,
+   the escrow import in `r/questmaster` (code, tests) and in `p/escrow/z_example_filetest.gno`, and the realm path in
+   the tests, filetests, `scripts/local-flow.sh` and the README. `grep -rn "g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/" .`
+   finds them all. Regenerate goldens (`gno test -update-golden-tests ./r/questmaster/`) and run the tests.
+3. Deploy the new escrow, wait until it is live, then the new realm (steps a to d).
+4. The old realm keeps working with what it holds: open quests there can still be finished or cancelled by their
+   posters. Point the README and the demo at the new realm.
+
+## For reference: how the namespace was set
+
+The code was written with the placeholder `questmaster_dev`; `scripts/set-namespace.sh g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8`
+replaced it in `p/`, `r/` and `scripts/local-flow.sh` and reran the tests. `r/sys/names.IsAuthorizedAddressForNamespace`
+returns true for this address and namespace on Onyx.

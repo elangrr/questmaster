@@ -33,7 +33,8 @@ gno repo at that tag.
 
 ## Namespace (decision still open)
 
-`p/escrow/gnomod.toml` uses the placeholder `gno.land/p/questmaster_dev/escrow`, which works for local `gno test`.
+Until task 6 the code used the placeholder `gno.land/p/questmaster_dev/escrow`. It now uses the owner's address
+namespace `g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8` (set with `scripts/set-namespace.sh`).
 
 What the docs say:
 
@@ -190,9 +191,9 @@ Other facts:
   lifecycle of 17 calls 10.4M. Recommended for every QuestMaster call: `-gas-wanted 10000000 -gas-fee 100000ugnot`
   (the minimum fee for 10M gas is 10,000 ugnot at today's price; 100,000 ugnot is 0.1 test GNOT and leaves room if
   the price rises). gnokey simulates a transaction before broadcasting (default `-simulate test`), so too little gas
-  fails before anything is paid. The help page in `r/questmaster/render.gno` still shows
-  `-gas-fee 1000000ugnot -gas-wanted 50000000` (1 GNOT per call): to be changed in the next code task.
-- Deploying (`gnokey maketx addpkg`): flags `-pkgpath`, `-pkgdir`, `-max-deposit`, plus `-gas-fee`, `-gas-wanted`,
+  fails before anything is paid. The help page in `r/questmaster/render.gno` uses these values
+  (changed in task 5 from `-gas-fee 1000000ugnot -gas-wanted 50000000`).
+- Deploying (`gnokey maketx addpkg`; gas values superseded by "Deploy facts" below): flags `-pkgpath`, `-pkgdir`, `-max-deposit`, plus `-gas-fee`, `-gas-wanted`,
   `-broadcast`, `-chainid`, `-remote`. It uploads every file in the folder, tests included. Sizes: `p/escrow` about
   36 KB, `r/questmaster` about 101 KB (with filetests); on gnodev the realm's stored size after deploy was about 66 KB,
   so a 6.6 GNOT deposit. Use `-max-deposit 30000000ugnot` for each package.
@@ -268,3 +269,29 @@ Cheapest reductions (not done; estimates from the table):
 2. Drop `openIDs` and find open quests by scanning `quests` from the newest: saves about 0.20 GNOT per post. Cost:
    the home page reads more quests when many are closed, so `Render` gets slower as the board grows.
 3. Do both: about 0.36 to 0.40 GNOT per post instead of about 0.76.
+
+## Deploy facts (task 6, v1.8.0 source and Onyx params, 2026-11-23)
+
+- **What addpkg uploads** (`gnolang.ReadMemPackage`): every `*.gno`, `*.toml` and `*.md` file and licence files in
+  the package folder (not hidden files or subfolders), plus `*_filetest.gno` from a `filetests/` subfolder. So
+  `p/escrow` uploads 4 files (46,683 bytes) and `r/questmaster` 8 files (125,853 bytes), tests included.
+- **Gas at submit under the inert policy**: `chargePreprocessGas` (keeper.go, "AddInertPackagePreprocess") charges
+  the submitter `preprocess_gas_per_byte` = 1,250 gas for every byte of every `.gno` file (tests and filetests too)
+  and `gnomod.toml`, plus `tx_size_cost_per_byte` = 10 per transaction byte. Estimates: escrow about 61M gas, realm
+  about 164M. Onyx block gas limit is 3,000,000,000 and the transaction size limit 1 MB. deploy.md uses
+  `-gas-wanted 100000000` (escrow) and `-gas-wanted 250000000` (realm), each with `-gas-fee 1000000ugnot`
+  (the earlier advice of 100M for every deploy is too low for the realm).
+- **Storage deposit for a deploy** is taken when the package is **enabled**, from the **creator** (not the
+  approver), against the `-max-deposit` given at submit (keeper_inert.go). It counts only realm objects created by
+  the package (`RealmStorageDiffs`); source blobs, tests included, are not charged a deposit (they are stored as
+  separate prod and "allbutprod" blobs). Measured on gnodev with the final code: escrow 38,205 bytes (3.82 GNOT),
+  realm 77,696 bytes (7.77 GNOT), the same with or without test files.
+- **init() under inert** runs in the approver's enable transaction with `OriginCaller` set to the creator; the
+  realm's `init()` records its own package path, which gnodev showed is correct.
+- **Approver-equivalent check**: in a clean copy holding only the files addpkg uploads, with an empty `GNOHOME`,
+  `gno mod download -remote-overrides gno.land=https://rpc.onyx.testnets.gno.land:443` fetched every import from
+  Onyx; `gno lint ./...` (type check and preprocess) and `gno test ./...` then passed with no other download. The
+  Onyx copies of `p/nt/avl/v0`, `p/moul/txlink/v0` and `p/nt/markdown/sanitize/v0` are byte-identical (sha256) to the
+  ones all tests ran against; sanitize differs from the v1.8.0 examples only in comments.
+- **Dry run**: `gnokey maketx addpkg ... -simulate only` signs and simulates without broadcasting and prints the gas
+  used (needs the key, so the owner runs it).
