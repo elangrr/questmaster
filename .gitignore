@@ -1,0 +1,12 @@
+# Gno tooling cache and build output
+.gno/
+*.out
+coverage*
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+# Never commit keys or local env
+*.key
+*.info
+.env
