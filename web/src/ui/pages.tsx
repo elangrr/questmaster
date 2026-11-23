@@ -1,14 +1,15 @@
-import { cloneElement, useEffect, useId, useState, type ReactNode } from "react";
+import { cloneElement, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Icon } from "./icons";
 import { config, gnowebPage, rules } from "../config";
 import { argsFor, actionsFor, NOT_CONNECTED, roleOf, type ActionOption } from "../lib/actions";
-import { QuestState, type Quest } from "../lib/amino";
+import { QuestState, type Quest, type Totals } from "../lib/amino";
 import { approx, gnot, thousands, windowToBlocks, type WindowUnit } from "../lib/format";
 import { read } from "../lib/rpc";
 import { checkDetails, checkLink, checkReason, checkReward, checkTitle, checkWorkBlocks } from "../lib/validate";
 import { useAsync } from "./hooks";
 import { Addr, CopyButton, Empty, ErrorBox, Gnot, Loading, Pager, PlainText, QuestTable, SafeLink, StateBadge } from "./parts";
-import { CountGnot, CountInt } from "./parts";
+import { GnotTotal } from "./parts";
+import { useMinWidth } from "./motion";
 import { Usd } from "./price";
 import { PosterNote, RecordLine, RecordPanel } from "./record";
 import { DeadlineFact, QuestFlow, QuestStepper, SkeletonBoard, SkeletonQuest, StepArt } from "./visuals";
@@ -29,6 +30,59 @@ export const ReviewWarning = () => (
 
 // ---------------------------------------------------------------- board
 
+const quests = (n: number) => (n === 1 ? "quest" : "quests");
+
+/**
+ * The board totals as one sentence, for example
+ * "25 open quests · 38.23 GNOT locked (≈ $1.91) · 3.5 GNOT paid out on 2 quests".
+ * Empty parts read naturally ("No open quests", "nothing paid out yet").
+ */
+export function TotalsLine({ totals: t }: { totals: Totals }) {
+  const parts: ReactNode[] = [];
+  parts.push(
+    t.openQuests === 0 ? (
+      <span key="open">No open quests</span>
+    ) : (
+      <span key="open">
+        <b className="total-num">{t.openQuests}</b> open {quests(t.openQuests)}
+      </span>
+    ),
+  );
+  if (t.locked > 0n)
+    parts.push(
+      <span key="locked">
+        <GnotTotal ugnot={t.locked} /> GNOT locked
+        <Usd ugnot={t.locked} paren />
+      </span>,
+    );
+  parts.push(
+    t.paidQuests === 0 ? (
+      <span key="paid">nothing paid out yet</span>
+    ) : (
+      <span key="paid">
+        <GnotTotal ugnot={t.paid} /> GNOT paid out on <b className="total-num">{t.paidQuests}</b> {quests(t.paidQuests)}
+      </span>
+    ),
+  );
+  return (
+    <>
+      {parts.map((p, i) => {
+        const last = i === parts.length - 1;
+        return (
+          // Each part stays on one line and carries its separator at the end, so a wrapped line never starts with "·".
+          <span key={i}>
+            <span className="total-part">
+              {p}
+              {!last && <span aria-hidden="true"> ·</span>}
+            </span>
+            {!last && " "}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
 export function Board({ query }: { query: URLSearchParams }) {
   const page = pageFrom(query);
   const [data, reload] = useAsync(async () => {
@@ -36,10 +90,13 @@ export function Board({ query }: { query: URLSearchParams }) {
     const ids = await read.openIds((page - 1) * rules.pageSize, rules.pageSize);
     return { totals, quests: await read.quests(ids) };
   }, [page]);
+  // Phones get no diagram at all (not rendered, so nothing loads or animates there):
+  // the steps are one tap away on How it works, and the quests come first.
+  const wide = useMinWidth(700);
 
   return (
     <>
-      <section className="hero" aria-labelledby="hero-title">
+      <section className={wide ? "hero has-visual" : "hero"} aria-labelledby="hero-title">
         <div data-enter>
           <h1 id="hero-title">
             Small tasks, <em>paid in GNOT</em>
@@ -58,36 +115,22 @@ export function Board({ query }: { query: URLSearchParams }) {
             </a>
           </div>
         </div>
-        <div className="hero-visual">
-          <QuestFlow />
-        </div>
+        {wide && (
+          <div className="hero-visual">
+            <QuestFlow />
+          </div>
+        )}
       </section>
+
+      {/* One line of totals; its height is reserved while the board loads. */}
+      <p className="totals">
+        {data.status === "ready" ? <TotalsLine totals={data.value.totals} /> : <span className="sk sk-line" aria-hidden="true" />}
+      </p>
 
       {data.status === "loading" && <SkeletonBoard />}
       {data.status === "error" && <ErrorBox error={data.error} onRetry={reload} />}
       {data.status === "ready" && (
         <>
-          <section className="stats" aria-label="Board totals">
-            <div className="stat">
-              <span className="stat-value"><CountInt n={data.value.totals.openQuests} /></span>
-              <span className="stat-label">open quests</span>
-            </div>
-            <div className="stat amber">
-              <span className="stat-value"><CountGnot ugnot={data.value.totals.locked} /></span>
-              <span className="stat-label">GNOT locked</span>
-              <Usd ugnot={data.value.totals.locked} block />
-            </div>
-            <div className="stat amber">
-              <span className="stat-value"><CountGnot ugnot={data.value.totals.paid} /></span>
-              <span className="stat-label">GNOT paid out</span>
-              <Usd ugnot={data.value.totals.paid} block />
-            </div>
-            <div className="stat">
-              <span className="stat-value"><CountInt n={data.value.totals.paidQuests} /></span>
-              <span className="stat-label">quests paid</span>
-            </div>
-          </section>
-
           <section>
             <div className="section-head">
               <h2>Open quests</h2>
@@ -269,8 +312,13 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
   const live = q.state !== QuestState.Paid && q.state !== QuestState.Cancelled;
   const finished = !live && lastTx !== null;
   const shortFacts = q.workLink ? 5 : 4; // work window, (work), times rejected, posted at, current block
+  const walletReady = !!w.address && w.onRightNetwork;
+  // The bar's "Other ways to sign" opens the first action that is not blocked for another reason.
+  const firstOpen = options.find((o) => o.blocked === null || o.blocked === NOT_CONNECTED)?.func ?? null;
+  const [request, setRequest] = useState<{ func: string; n: number } | null>(null);
   return (
     <article className="quest">
+      <div className="quest-top">
       <p className="crumbs">
         <a href="#/">Board</a> <span aria-hidden="true">/</span> Quest {q.id.toString()}
       </p>
@@ -303,10 +351,12 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
         </div>
       )}
       {q.state === QuestState.Submitted && role === "poster" && <ReviewWarning />}
+      </div>
 
-      {/* Facts grid (>= 700 px): the deadline across the full width, then poster and builder as two
+      {/* Facts. From 1100 px: a quiet column on the right. Below: a grid (>= 700 px): the deadline across the full width, then poster and builder as two
           equal columns, then the short facts in one row. --cols = 2 x the number of short facts,
           so both rows divide evenly and no cell is left alone. */}
+      <aside className="quest-side" aria-label="Quest facts">
       <dl className="facts" style={{ ["--cols" as string]: shortFacts * 2, ["--half" as string]: shortFacts }}>
         {q.state === QuestState.Claimed && <DeadlineFact label="Work deadline" start={q.claimedAt} deadline={q.workDeadline} h={h} />}
         {q.state === QuestState.Submitted && <DeadlineFact label="Review deadline" start={q.submittedAt} deadline={q.reviewDeadline} h={h} />}
@@ -318,7 +368,9 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
         <div className="fact-short"><dt>Posted at block</dt><dd>{thousands(q.createdAt)}</dd></div>
         <div className="fact-short"><dt>Current block</dt><dd>{thousands(h)}</dd></div>
       </dl>
+      </aside>
 
+      <div className="quest-rest">
       <section>
         <h2>Details</h2>
         {q.details.trim() === "" ? <p className="muted">No details given.</p> : <PlainText text={q.details} />}
@@ -336,12 +388,17 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
         {lastTx && <TxSent hash={lastTx.hash} what={lastTx.what} block={lastTx.block} celebrate={finished} />}
         {q.state === QuestState.Paid && <p>Nothing: this quest is finished and the builder was paid <Gnot ugnot={q.reward} />.</p>}
         {q.state === QuestState.Cancelled && <p>Nothing: this quest was cancelled and the reward went back to the poster.</p>}
+        {!walletReady && options.length > 0 && (
+          <SignInBar onOtherWays={firstOpen ? () => setRequest({ func: firstOpen, n: (request?.n ?? 0) + 1 }) : null} />
+        )}
         <ul className="actions">
           {options.map((o) => (
             <ActionItem
               key={o.func}
               q={q}
               o={o}
+              walletReady={walletReady}
+              request={request?.func === o.func ? request.n : 0}
               onDone={(hash, block) => {
                 setLastTx({ what: o.label, hash, block });
                 onChanged();
@@ -354,36 +411,78 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
           <a href={gnowebPage(`quest/${q.id}`)} target="_blank" rel="noopener noreferrer">This quest on gnoweb</a>
         </p>
       </section>
+      </div>
     </article>
   );
 }
 
-function ActionItem({ q, o, onDone }: { q: Quest; o: ActionOption; onDone: (hash: string, block: bigint | null) => void }) {
+/** One bar above the action list while no wallet is ready: what is needed, the one wallet button, and other ways to sign. */
+function SignInBar({ onOtherWays }: { onOtherWays: (() => void) | null }) {
+  const w = useWallet();
+  let text: string;
+  let button: ReactNode;
+  if (!w.installed) {
+    text = "To sign these actions here you need the Adena wallet.";
+    button = (
+      <a className="btn btn-primary" href="https://adena.app" target="_blank" rel="noopener noreferrer">
+        Get Adena
+      </a>
+    );
+  } else if (!w.address) {
+    text = "Connect a wallet to sign these actions.";
+    button = (
+      <button className="btn btn-primary" onClick={() => void w.connect()} disabled={w.busy}>
+        Connect wallet
+      </button>
+    );
+  } else {
+    text = `Adena is on ${w.chainId || "another network"}; switch it to sign here.`;
+    button = (
+      <button className="btn btn-primary" onClick={() => void w.switchNetwork()} disabled={w.busy}>
+        Switch to {config.chainId}
+      </button>
+    );
+  }
+  return (
+    <div className="signin-bar" data-signin-bar>
+      <p>{text} Each action below also has a gnokey command and a gnoweb form.</p>
+      <div className="signin-buttons">
+        {button}
+        {onOtherWays && (
+          <button className="btn btn-ghost-text" onClick={onOtherWays}>
+            Other ways to sign
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ActionItem({ q, o, walletReady, request, onDone }: { q: Quest; o: ActionOption; walletReady: boolean; request: number; onDone: (hash: string, block: bigint | null) => void }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
-  const w = useWallet();
+  const body = useRef<HTMLDivElement>(null);
   const problem = o.input === "link" ? checkLink(input) : o.input === "reason" ? checkReason(input) : null;
   const notConnected = o.blocked === NOT_CONNECTED;
   const disabled = o.blocked !== null && !notConnected;
+  // Opened from the sign-in bar: open this action's panel and move focus into it.
+  useEffect(() => {
+    if (request > 0) setOpen(true);
+  }, [request]);
+  useEffect(() => {
+    if (request > 0 && open) body.current?.focus();
+  }, [request, open]);
   return (
     <li className={`action ${disabled ? "blocked" : ""}`}>
       <div className="action-row">
         <div>
           <strong>{o.label}</strong> <span className="muted">· {o.who}</span>
           <p className="action-explain">{o.explain}</p>
-          {o.blocked && <p className="muted small">{o.blocked}</p>}
+          {o.blocked && !notConnected && <p className="muted small">{o.blocked}</p>}
         </div>
-        {notConnected ? (
+        {!walletReady && !disabled ? (
+          // No wallet ready: the bar above holds the wallet button; each action keeps one quiet control.
           <div className="action-buttons">
-            {w.installed ? (
-              <button className="btn btn-primary" onClick={() => void w.connect()} disabled={w.busy}>
-                Connect wallet
-              </button>
-            ) : (
-              <a className="btn btn-primary" href="https://adena.app" target="_blank" rel="noopener noreferrer">
-                Get Adena
-              </a>
-            )}
             <button className="btn btn-ghost-text" aria-expanded={open} onClick={() => setOpen(!open)}>
               {open ? "Hide" : "Other ways to sign"}
             </button>
@@ -397,7 +496,7 @@ function ActionItem({ q, o, onDone }: { q: Quest; o: ActionOption; onDone: (hash
         )}
       </div>
       {open && (
-        <div className="action-body">
+        <div className="action-body" ref={body} tabIndex={-1} aria-label={`${o.label}: how to sign`}>
           {o.func === "ClaimQuest" && <PosterNote address={q.poster} />}
           {o.input === "link" && (
             <Field label="Link to the work" hint={`Starts with https://, at most ${rules.maxLinkLen} characters.`} error={input ? problem : null}>
@@ -410,7 +509,7 @@ function ActionItem({ q, o, onDone }: { q: Quest; o: ActionOption; onDone: (hash
             </Field>
           )}
           <TxPanel
-            fallbackOpen={notConnected}
+            fallbackOpen={!walletReady}
             spec={{ func: o.func, args: argsFor(o.func, q.id, input), questId: q.id, label: o.label, problem: o.input ? problem : null }}
             onDone={(hash, block) => {
               setOpen(false);

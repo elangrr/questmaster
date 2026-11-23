@@ -35,11 +35,11 @@ test("served from a sub-path; header, network label and footer", async ({ page }
 
 test("board: totals, 20 open quests newest first, paging", async ({ page }) => {
   await open(page, "/");
-  const stats = page.locator(".stats");
-  await expect(stats).toContainText("25open quests");
-  await expect(stats).toContainText("38.234567GNOT locked");
-  await expect(stats).toContainText("3.5GNOT paid out");
-  await expect(stats).toContainText("2quests paid");
+  const totals = page.locator("p.totals");
+  await expect(totals).toContainText("25 open quests");
+  await expect(totals).toContainText("38.2338.234567 GNOT locked"); // shown 38.23; exact 38.234567 for screen readers
+  await expect(totals).toContainText("3.53.5 GNOT paid out on 2 quests");
+  await expect(totals.locator(".total-num").nth(1)).toHaveAttribute("title", "38.234567 GNOT");
   const rows = page.locator("table.quests tbody tr");
   await expect(rows).toHaveCount(20);
   await expect(rows.first()).toContainText("Small task 24");
@@ -101,10 +101,11 @@ test("every state shows the right facts and next steps", async ({ page }) => {
 test("without a wallet, actions explain and offer gnokey and gnoweb", async ({ page }) => {
   await open(page, "/quest/31");
   const claim = page.locator(".action", { hasText: "Take this quest" });
-  await expect(claim).toContainText("Connect a wallet to do this.");
-  // No "Do this" without a wallet: the main button gets Adena; the fallback is one click away, already open.
+  // No wallet: one bar holds the wallet button; each action keeps one quiet "Other ways to sign".
+  const bar = page.locator("[data-signin-bar]");
+  await expect(bar.getByRole("link", { name: "Get Adena" })).toHaveAttribute("href", "https://adena.app");
   await expect(claim.getByRole("button", { name: "Do this" })).toHaveCount(0);
-  await expect(claim.getByRole("link", { name: "Get Adena" })).toHaveAttribute("href", "https://adena.app");
+  await expect(claim.getByRole("link", { name: "Get Adena" })).toHaveCount(0);
   await claim.getByRole("button", { name: "Other ways" }).click();
   await expect(claim).toContainText("install the Adena wallet");
   await expect(claim.locator("pre.cmd")).toContainText(`-pkgpath '${REALM}'`);
@@ -182,12 +183,13 @@ test("with a mocked Adena: connect, wrong network, claim sends the exact message
     };
   }, [BUILDER]);
   await open(page, "/quest/31");
-  // Not connected yet: each action offers "Connect wallet" instead of "Do this".
+  // Not connected yet: one sign-in bar holds "Connect wallet"; the actions have no "Do this".
   const claim = page.locator(".action", { hasText: "Take this quest" });
   await expect(claim.getByRole("button", { name: "Do this" })).toHaveCount(0);
-  await claim.getByRole("button", { name: "Connect wallet" }).click();
-  await expect(page.getByRole("button", { name: "Switch to dev" })).toBeVisible();
-  await page.getByRole("button", { name: "Switch to dev" }).click();
+  await page.locator("[data-signin-bar]").getByRole("button", { name: "Connect wallet" }).click();
+  // Wrong network: the header and the sign-in bar both offer the switch; use the header's.
+  await expect(page.locator("[data-signin-bar]").getByRole("button", { name: "Switch to dev" })).toBeVisible();
+  await page.locator("header").getByRole("button", { name: "Switch to dev" }).click();
   await expect(page.locator(".wallet-addr")).toHaveText("g1us8428…njlj");
   await claim.getByRole("button", { name: "Do this" }).click();
   await claim.getByRole("button", { name: "Take this quest" }).click();
@@ -221,8 +223,7 @@ test("dollar hint: shown next to GNOT, live in the post form, never in a transac
   await context.unroute(`${PRICE_HOST}**`);
   await mockPrice(context, 0.124);
   await open(page, "/");
-  const stats = page.locator(".stats");
-  await expect(stats).toContainText("38.234567GNOT locked≈ $4.74"); // 38.234567 × 0.124
+  await expect(page.locator("p.totals")).toContainText("GNOT locked (≈ $4.74)"); // 38.234567 × 0.124
   await expect(page.locator("table.quests tbody tr").first().locator("td.num [data-usd]")).toHaveText(/^≈ \$\d+\.\d\d/);
   await expect(page.locator("[data-usd]").first()).toHaveAttribute("title", /mainnet GNOT price \(\$0\.124 per GNOT, CoinGecko, fetched .+\)\. Test GNOT has no real value\./);
   await expect(page.locator("footer [data-price-note]")).toContainText("Dollar figures are approximate");
@@ -257,7 +258,7 @@ for (const [name, handler] of [
     await context.unroute(`${PRICE_HOST}**`);
     await context.route(`${PRICE_HOST}**`, handler as any);
     await open(page, "/");
-    await expect(page.locator(".stats")).toContainText("38.234567GNOT locked");
+    await expect(page.locator("p.totals")).toContainText("GNOT locked");
     await expect(page.locator("table.quests tbody tr")).toHaveCount(20); // the board renders regardless
     await page.waitForTimeout(4200); // past the 3.5 s timeout
     await expect(page.locator("[data-usd]")).toHaveCount(0);
@@ -600,7 +601,22 @@ test("design: icons are drawn SVG in the text colour; no glyphs as icons", async
   expect(problems).toEqual([]);
 });
 
-for (const width of [390, 768, 1024, 1280]) {
+test("board on phones: no diagram, nothing animating, quests come sooner", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await mockPrice(ctx);
+  const page = await ctx.newPage();
+  await page.goto(`${APP}#/`);
+  await expect(page.locator("table.quests tbody tr")).toHaveCount(20);
+  await expect(page.locator("[data-testid=quest-flow]")).toHaveCount(0);
+  await expect(page.locator(".hero-visual")).toHaveCount(0);
+  expect(await page.evaluate(() => document.getAnimations().filter((a) => a.playState === "running" && /flow/.test((a as CSSAnimation).animationName ?? "")).length)).toBe(0);
+  const top = await page.getByRole("heading", { name: "Open quests" }).evaluate((h) => h.getBoundingClientRect().top + scrollY);
+  console.log(`BOARD 390px: "Open quests" starts at ${Math.round(top)}px`);
+  expect(top).toBeLessThan(900); // was 1185 px with the diagram and the four tiles
+  await ctx.close();
+});
+
+for (const width of [768, 1024, 1280]) {
   test(`design: hero diagram text is at least 12 px at ${width} px`, async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce" });
     await mockPrice(ctx);
@@ -701,6 +717,46 @@ for (const width of [1280, 768, 390]) {
     expect(problems).toEqual([]);
   });
 }
+
+for (const [width, cols] of [[1280, 2], [1024, 1]] as const) {
+  test(`quest page: ${cols === 2 ? "two columns" : "one column"} at ${width} px in every state`, async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 } });
+    await mockPrice(ctx);
+    const page = await ctx.newPage();
+    for (const id of [31, 3, 4, 5, 1, 2, 7]) {
+      await page.goto(`${APP}#/quest/${id}`);
+      await page.locator("dl.facts").waitFor();
+      const g = await page.evaluate(() => {
+        const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+        const top = r(".quest-top"), side = r(".quest-side"), rest = r(".quest-rest");
+        const overflow = Array.from(document.querySelectorAll(".quest-side *")).some((e) => e.getBoundingClientRect().right > side.right + 0.5);
+        return { sideRight: side.left >= top.right - 0.5 && side.left >= rest.right - 0.5, sideBelowTop: side.top >= top.bottom - 0.5, overflow };
+      });
+      if (cols === 2) {
+        expect(g.sideRight, `quest ${id}: facts to the right`).toBe(true);
+      } else {
+        expect(g.sideBelowTop, `quest ${id}: facts below the header`).toBe(true);
+      }
+      expect(g.overflow, `quest ${id}: something sticks out of the facts column`).toBe(false);
+    }
+    await ctx.close();
+  });
+}
+
+test("one wallet button per action list without a wallet", async ({ page }) => {
+  for (const id of [31, 3, 4, 5]) {
+    await open(page, `/quest/${id}`);
+    await page.locator("dl.facts").waitFor();
+    const section = page.locator("main section", { has: page.getByRole("heading", { name: "What can happen next" }) });
+    await expect(section.getByRole("link", { name: "Get Adena" }).or(section.getByRole("button", { name: /Connect wallet|Switch to/ }))).toHaveCount(1);
+    await expect(section.locator(".actions .btn-primary")).toHaveCount(0);
+  }
+  // The bar's "Other ways to sign" opens the first available action and moves focus into it.
+  await open(page, "/quest/31");
+  await page.locator("[data-signin-bar]").getByRole("button", { name: "Other ways to sign" }).click();
+  await expect(page.locator(".action-body").first()).toBeFocused();
+  await expect(page.locator(".action-body pre.cmd").first()).toContainText("-func 'ClaimQuest'");
+});
 
 test("no horizontal overflow at 360 px", async ({ browser }) => {
   test.setTimeout(120_000);

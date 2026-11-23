@@ -21,11 +21,14 @@ Tick each line. If something looks wrong, note the step, what you saw, and the
 transaction link the app showed.
 
 **Connecting**
-- [ ] Without Adena (or in a private window), the header says "Get Adena", and
-      each action offers a gnokey command and a gnoweb link.
+- [ ] Without Adena (or in a private window), the header says "Get Adena". On a
+      quest page one bar above the actions offers "Get Adena" and "Other ways to
+      sign"; each action has its own "Other ways to sign" with a gnokey command
+      and a gnoweb link (no wallet button repeated per action).
 - [ ] Click **Connect wallet** and approve in Adena: your short address appears
       top right.
-- [ ] Switch Adena to another network: the app shows "Switch to onyx-1".
+- [ ] Switch Adena to another network: the header and the quest page's bar show
+      "Switch to onyx-1".
       Click it and approve: the button goes back to your address.
 - [ ] The header label says "Onyx testnet · test GNOT".
 
@@ -37,7 +40,8 @@ transaction link the app showed.
 - [ ] Click **Post and lock the reward**, check Adena shows a call to
       `PostQuest` with 2 GNOT sent, and sign.
 - [ ] The app shows "Sent: your quest" with a GnoScan link that opens.
-- [ ] On the board the quest appears with 2 GNOT; "GNOT locked" went up by 2.
+- [ ] On the board the quest appears with 2 GNOT; the totals line under the
+      heading shows 2 more GNOT locked and one more open quest.
 
 **Claiming and submitting (as Builder)**
 - [ ] Switch Adena to Builder. Open the quest. "Take this quest" is enabled;

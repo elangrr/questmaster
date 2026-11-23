@@ -95,6 +95,7 @@
   --control-pad: 0 var(--s-4);
   --control-pad-sm: 0 var(--s-3);
   --action-w: 176px; /* the button column in an action list */
+  --side-w: 340px; /* the facts column on wide quest pages */
   --badge-h: 24px;
   --header-h: 61px; /* sticky header height (one row) */
   --focus-ring: 3px;
@@ -292,7 +293,7 @@ ul, ol { margin: 0 0 var(--s-3); }
 .main { max-width: var(--content); margin: 0 auto; padding: var(--s-5) var(--gutter) var(--s-7); min-height: 100vh; }
 .main:focus { outline: none; }
 .page-enter { animation: page-in 320ms var(--ease-enter) both; }
-@keyframes page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes page-in { from { transform: translateY(6px); } to { transform: none; } } /* no fade: content counts as painted at once */
 
 /* ------------------------------------------------------------ buttons, inputs */
 .btn {
@@ -349,7 +350,8 @@ textarea.input { resize: vertical; }
   border: var(--border) solid var(--line); border-radius: var(--r-card); padding: var(--pad-card); box-shadow: var(--shadow-2);
 }
 @media (max-width: 1099px) { .hero { grid-template-columns: 1fr; gap: var(--s-5); } } /* the diagram needs the full width to stay readable */
-[data-enter] > * { animation: enter 640ms var(--ease-enter) both; }
+[data-enter] > * { animation: enter-slide 640ms var(--ease-enter) both; } /* no fade: the hero text is visible (and measurable as the first content) from the first paint */
+@keyframes enter-slide { from { transform: translateY(10px); } to { transform: none; } }
 [data-enter] > *:nth-child(2) { animation-delay: 70ms; }
 [data-enter] > *:nth-child(3) { animation-delay: 140ms; }
 [data-enter] > *:nth-child(4) { animation-delay: 210ms; }
@@ -360,16 +362,6 @@ textarea.input { resize: vertical; }
 .flow { position: relative; }
 .flow-svg { aspect-ratio: 616 / 236; width: 100%; height: auto; display: block; overflow: visible; }
 .flow-toggle { position: absolute; top: 0; right: 0; color: var(--muted); }
-/* Phones: the steps as text, so nothing renders at a few pixels. */
-.flow-list { display: none; margin: 0; padding-left: var(--s-5); }
-.flow-list li { padding: var(--s-1) 0; }
-.flow-list li::marker { color: var(--brand); font-weight: var(--fw-bold); }
-.flow-list span { color: var(--muted); }
-.flow-exits { display: none; margin: var(--s-2) 0 0; color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
-@media (max-width: 699px) {
-  .flow-svg, .flow-toggle { display: none; }
-  .flow-list, .flow-exits { display: block; }
-}
 .flow-line { fill: none; stroke: var(--line-2); stroke-width: 3; stroke-linecap: round; }
 .flow-progress { stroke: var(--brand); stroke-dasharray: 100; stroke-dashoffset: 100; animation: flow-progress 9.6s linear infinite; }
 @keyframes flow-progress { 0% { stroke-dashoffset: 100; } 80%, 92% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
@@ -404,20 +396,21 @@ textarea.input { resize: vertical; }
 .flow.paused * { animation-play-state: paused !important; }
 
 /* ------------------------------------------------------------ cards: one padding, radius and border */
-.card, .stat, .record-card, .step-card, .rule-card, .plain, .cost, .prompt {
+.card, .record-card, .step-card, .rule-card, .plain, .cost, .prompt {
   background: var(--surface); border: var(--border) solid var(--line); border-radius: var(--r-card); padding: var(--pad-card);
 }
-.stat, .record-card, .step-card, .table-wrap, .facts { box-shadow: var(--shadow-1); }
+.record-card, .step-card, .table-wrap, .facts { box-shadow: var(--shadow-1); }
 
-/* ------------------------------------------------------------ stats */
-.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-3); margin: var(--s-5) 0 var(--s-2); }
-@media (max-width: 899px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.stat { position: relative; overflow: hidden; }
-.stat-value, .rec-stat dd, .big-reward .amount { font: var(--fw-bold) var(--fs-number) / var(--lh-tight) var(--serif); font-variant-numeric: tabular-nums; }
-.stat-value { display: block; margin-bottom: var(--s-1); }
+/* ------------------------------------------------------------ totals: one sentence under the hero */
+.totals { margin: var(--s-4) 0 0; color: var(--ink-2); font-size: var(--fs-body); line-height: var(--lh-body); min-height: calc(var(--fs-body) * var(--lh-body)); }
+@media (max-width: 699px) { .totals { min-height: calc(var(--fs-body) * var(--lh-body) * 3); } } /* up to three lines on phones */
+.total-part { white-space: nowrap; } /* wrap only between the parts */
+.total-num { color: var(--ink); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
+.totals .sk-line { display: inline-block; width: 60%; height: var(--s-4); vertical-align: middle; }
+.rec-stat dd, .big-reward .amount { font: var(--fw-bold) var(--fs-number) / var(--lh-tight) var(--serif); font-variant-numeric: tabular-nums; }
 
 /* captions: one style for stat labels, fact labels, record labels and table headers */
-.stat-label, .facts dt, .rec-stat dt, .quests th {
+.facts dt, .rec-stat dt, .quests th {
   font-size: var(--fs-micro); line-height: var(--lh-small); font-weight: var(--fw-semibold);
   color: var(--muted);
 }
@@ -511,6 +504,16 @@ table.quests { width: 100%; border-collapse: collapse; }
 .sk-title { width: 70%; }
 
 /* ------------------------------------------------------------ quest page */
+/* From 1100 px: two columns. Left: title, stepper, details, actions. Right: the facts,
+   as one quiet block. Below 1100 px: one column with the facts grid between them. */
+@media (min-width: 1100px) {
+  .quest { display: grid; grid-template-columns: minmax(0, 1fr) var(--side-w); grid-template-rows: auto 1fr; column-gap: var(--s-6); align-items: start; }
+  .quest-top { grid-column: 1; grid-row: 1; min-width: 0; }
+  .quest-rest { grid-column: 1; grid-row: 2; min-width: 0; }
+  .quest-side { grid-column: 2; grid-row: 1 / span 2; min-width: 0; padding-top: calc(var(--fs-small) * var(--lh-small) + var(--s-2)); } /* starts level with the title */
+  .quest-side .facts { margin-top: 0; box-shadow: none; grid-template-columns: minmax(0, 1fr); }
+  .quest-side .facts > .fact-person, .quest-side .facts > .fact-short, .quest-side .facts > .deadline { grid-column: 1 / -1; }
+}
 .crumbs { margin: 0 0 var(--s-2); color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
 .quest-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); margin-bottom: var(--s-2); }
 .quest-head h1 { margin: 0; }
@@ -563,6 +566,13 @@ table.quests { width: 100%; border-collapse: collapse; }
 .facts dd { margin: var(--s-1) 0 0; overflow-wrap: anywhere; font-size: var(--fs-body); line-height: var(--lh-body); }
 .you { margin-left: var(--s-2); display: inline-flex; align-items: center; height: var(--badge-h); padding: 0 var(--s-2); font-size: var(--fs-micro); font-weight: var(--fw-semibold); background: var(--brand-soft); color: var(--brand); border-radius: var(--r-pill); }
 .plain { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-size: var(--fs-body); }
+/* While no wallet is ready: one bar above the actions with the one wallet button. */
+.signin-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3) var(--s-4); margin: 0 0 var(--s-3); padding: var(--pad-inset) var(--s-4); background: var(--surface-2); border-radius: var(--r-card); } /* a tint, not another bordered card */
+.signin-bar p { margin: 0; flex: 1 1 18rem; color: var(--ink-2); }
+.signin-buttons { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+@media (max-width: 699px) { .signin-buttons, .signin-buttons .btn { width: 100%; } }
+.action-body:focus { outline: none; }
+
 /* One list, not a stack of cards: the actions share a border and are split by rules. */
 .actions { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); background: var(--surface); border: var(--border) solid var(--line); border-radius: var(--r-card); }
 .action { min-width: 0; padding: var(--pad-card); }

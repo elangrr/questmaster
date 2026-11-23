@@ -5,7 +5,6 @@ import { QuestState, type Quest } from "../lib/amino";
 import { approx, gnot, shortAddr, thousands } from "../lib/format";
 import { ReadError } from "../lib/rpc";
 import { Usd } from "./price";
-import { useCountUp } from "./motion";
 import { EmptyArt, ErrorArt, SkeletonRows, WaitingArt } from "./visuals";
 
 export function stateLabel(q: Quest): string {
@@ -43,29 +42,18 @@ export function Gnot({ ugnot, usd = "inline" }: { ugnot: bigint; usd?: "inline" 
   );
 }
 
-/** A whole number that counts up once on first show (at once under reduced motion). */
-export function CountInt({ n }: { n: number | bigint }) {
-  const target = Number(n);
-  const v = useCountUp(target);
-  return <>{v === target ? n.toString() : Math.round(v).toString()}</>;
-}
-
-/** A GNOT total that counts up once; ends on the exact value. */
 /**
- * A GNOT total that counts up once. Totals show at most 2 decimals (summary,
- * not ledger); the exact amount is in the tooltip and for screen readers.
+ * A GNOT total for a summary sentence: at most 2 decimals, the exact amount
+ * in the tooltip and for screen readers.
  */
-export function CountGnot({ ugnot }: { ugnot: bigint }) {
+export function GnotTotal({ ugnot }: { ugnot: bigint }) {
   const exact = gnot(ugnot);
   const shown = gnot(((ugnot + 5_000n) / 10_000n) * 10_000n); // nearest 0.01
-  const target = Number(shown);
-  const v = useCountUp(target);
-  const decimals = shown.includes(".") ? shown.split(".")[1].length : 0;
   return (
-    <span title={`${exact} GNOT`}>
-      <span aria-hidden="true">{v === target ? shown : v.toFixed(decimals)}</span>
+    <b className="total-num" title={`${exact} GNOT`}>
+      <span aria-hidden="true">{shown}</span>
       <span className="sr-only">{exact}</span>
-    </span>
+    </b>
   );
 }
 

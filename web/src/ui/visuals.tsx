@@ -34,8 +34,8 @@ const FLOW = [
  * How a quest moves. Wide screens: a small looping SVG diagram (a coin
  * travels along the main path; dashed branches show the refund and the
  * timeout payout), with a pause button; it also pauses off-screen and in
- * hidden tabs, and is static under reduced motion. Phones: the same steps
- * as a short HTML list, so nothing renders at a few pixels.
+ * hidden tabs, and is static under reduced motion. Not rendered on phones
+ * (the board leaves it out below 700 px; How it works has the steps).
  */
 export function QuestFlow() {
   const ref = useRef<HTMLDivElement>(null);
@@ -83,14 +83,6 @@ export function QuestFlow() {
           <path d="M-3 0h6M0-3v6" />
         </g>
       </svg>
-      <ol className="flow-list" aria-label="How a quest moves">
-        {FLOW.map((n) => (
-          <li key={n.label}>
-            <strong>{n.label}</strong> <span>{n.sub}</span>
-          </li>
-        ))}
-      </ol>
-      <p className="flow-exits">Exits: a closed quest refunds the poster; a submission left unanswered for about 7 days pays the builder.</p>
       <button type="button" className="btn btn-small btn-ghost flow-toggle" onClick={() => setUserPaused(!userPaused)} aria-pressed={userPaused} aria-label={userPaused ? "Play the diagram" : "Pause the diagram"}>
         <Icon name={userPaused ? "play" : "pause"} />
       </button>
@@ -167,14 +159,6 @@ export function SkeletonBoard() {
   return (
     <div role="status" className="skeleton-wrap">
       <span className="sr-only">Reading the board…</span>
-      <div className="stats">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="stat skeleton-card">
-            <span className="sk sk-num" />
-            <span className="sk sk-line short" />
-          </div>
-        ))}
-      </div>
       <SkeletonRows />
     </div>
   );

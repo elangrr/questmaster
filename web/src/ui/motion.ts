@@ -56,3 +56,18 @@ export function usePageVisible(): boolean {
   }, []);
   return v;
 }
+
+/** True while the viewport is at least `px` wide (read at once, so the first render is right). */
+export function useMinWidth(px: number): boolean {
+  const query = `(min-width: ${px}px)`;
+  const [match, setMatch] = useState(() => typeof window === "undefined" || !window.matchMedia || window.matchMedia(query).matches);
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    const f = () => setMatch(mq.matches);
+    f();
+    mq.addEventListener("change", f);
+    return () => mq.removeEventListener("change", f);
+  }, [query]);
+  return match;
+}

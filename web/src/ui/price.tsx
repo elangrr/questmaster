@@ -66,7 +66,7 @@ export function priceNote(p: GnotPrice): string {
  * "≈ $0.25" after a GNOT amount. `block` puts it on its own line and keeps
  * that line's height while the price loads (no layout shift).
  */
-export function Usd({ ugnot, block = false }: { ugnot: bigint | null; block?: boolean }) {
+export function Usd({ ugnot, block = false, paren = false }: { ugnot: bigint | null; block?: boolean; paren?: boolean }) {
   const s = usePrice();
   if (s.status === "off" || ugnot === null) return null;
   if (s.status === "loading") return block ? <span className="usd usd-block usd-pending" aria-hidden="true">&nbsp;</span> : null;
@@ -75,8 +75,8 @@ export function Usd({ ugnot, block = false }: { ugnot: bigint | null; block?: bo
   const note = priceNote(s.price);
   return (
     <span className={block ? "usd usd-block" : "usd"} title={note} data-usd>
-      {!block && <span aria-hidden="true"> · </span>}
-      {text}
+      {!block && !paren && <span aria-hidden="true"> · </span>}
+      {paren ? ` (${text})` : text}
       <span className="sr-only"> (approximate, at the mainnet GNOT price)</span>
     </span>
   );
