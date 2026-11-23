@@ -8,9 +8,9 @@ import { approx, thousands, timeLeft } from "../lib/format";
 import { useInView, usePageVisible } from "./motion";
 
 /** The QuestMaster mark: a notice board hanging from a peg, with a pinned quest. */
-export function Mark({ size = 28 }: { size?: number }) {
+export function Mark() {
   return (
-    <svg className="mark" viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">
+    <svg className="mark" viewBox="0 0 32 32" aria-hidden="true">
       <rect x="1" y="1" width="30" height="30" rx="8" fill="var(--brand)" />
       <path d="M16 5.5v3.2" stroke="var(--brand-ink)" strokeWidth="1.8" strokeLinecap="round" />
       <path d="M9.5 11.5 16 8.7l6.5 2.8" fill="none" stroke="var(--brand-ink)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -98,7 +98,7 @@ export function QuestStepper({ q }: { q: Quest }) {
           <li key={s} className={`step ${state}`} aria-current={state === "current" ? "step" : undefined}>
             <span className="step-dot" aria-hidden="true">
               {state === "done" ? (
-                <svg viewBox="0 0 16 16" width="12" height="12">
+                <svg className="step-check" viewBox="0 0 16 16">
                   <path d="m3.5 8.5 3 3 6-6.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               ) : (
@@ -204,7 +204,7 @@ export function SkeletonQuest() {
 /** An empty notice board (no quests yet). */
 export function EmptyArt() {
   return (
-    <svg className="art" viewBox="0 0 96 72" width="96" height="72" aria-hidden="true">
+    <svg className="art art-wide" viewBox="0 0 96 72" aria-hidden="true">
       <path d="M48 6v8" className="art-line" />
       <path d="M22 22 48 12l26 10" className="art-line" />
       <rect x="14" y="22" width="68" height="44" rx="6" className="art-board" />
@@ -218,7 +218,7 @@ export function EmptyArt() {
 /** A lantern with a pause mark (waiting, not live yet). */
 export function WaitingArt() {
   return (
-    <svg className="art" viewBox="0 0 72 72" width="72" height="72" aria-hidden="true">
+    <svg className="art" viewBox="0 0 72 72" aria-hidden="true">
       <path d="M36 6v6" className="art-line" />
       <path d="M26 14h20l4 8H22z" className="art-board" />
       <rect x="22" y="22" width="28" height="34" rx="6" className="art-paper" />
@@ -231,7 +231,7 @@ export function WaitingArt() {
 /** A torn notice (something went wrong). */
 export function ErrorArt() {
   return (
-    <svg className="art" viewBox="0 0 72 72" width="72" height="72" aria-hidden="true">
+    <svg className="art" viewBox="0 0 72 72" aria-hidden="true">
       <path d="M16 12h40v30l-8 6 6 6-6 6H16z" className="art-paper" />
       <path d="M26 26h20M26 34h14" className="art-line" />
       <circle cx="36" cy="8" r="3" className="art-amber" />
@@ -253,7 +253,7 @@ export function CoinBurst() {
 /** Small looping illustrations for the five steps on the How it works page. */
 export function StepArt({ step }: { step: 1 | 2 | 3 | 4 | 5 }) {
   return (
-    <svg className={`step-art step-art-${step}`} viewBox="0 0 80 64" width="80" height="64" aria-hidden="true">
+    <svg className={`step-art step-art-${step}`} viewBox="0 0 80 64" aria-hidden="true">
       {step === 1 && (
         <>
           <rect x="18" y="34" width="44" height="22" rx="4" className="art-board" />

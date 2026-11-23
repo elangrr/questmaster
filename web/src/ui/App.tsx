@@ -100,17 +100,21 @@ function Shell() {
             <Mark />
             QuestMaster
           </a>
-          <span className="net" title={`Chain ${config.chainId}, ${config.rpcUrl}`}>
-            {config.networkName} · test GNOT
-          </span>
-          <nav className="nav" aria-label="Main">
+          {/* Wide screens: one row. Narrower: brand and actions on top, then one
+              scrollable row with the network label and the links (never two rows of links). */}
+          <div className="top-nav">
+            <span className="net" title={`Chain ${config.chainId}, ${config.rpcUrl}`}>
+              {config.networkName} · test GNOT
+            </span>
+            <nav className="nav" aria-label="Main">
             <NavLink to="/">Board</NavLink>
             <NavLink to="/paid">Paid</NavLink>
             <NavLink to="/mine">My quests</NavLink>
             <NavLink to="/post">Post</NavLink>
             <NavLink to="/how">How it works</NavLink>
             <NavLink to="/agents">AI agents</NavLink>
-          </nav>
+            </nav>
+          </div>
           <div className="top-actions">
             <ThemeToggle />
             <WalletButton />
@@ -128,9 +132,15 @@ function Shell() {
       <footer className="foot">
         <p>
           Built on <a href="https://gno.land" target="_blank" rel="noopener noreferrer">gno.land</a> ·{" "}
-          <a href={config.sourceUrl} target="_blank" rel="noopener noreferrer">Source</a> · Realm{" "}
-          <a className="mono wrap" href={gnowebPage()} target="_blank" rel="noopener noreferrer">
-            {config.realmPath}
+          <a href={config.sourceUrl} target="_blank" rel="noopener noreferrer">Source</a>
+        </p>
+        <p>
+          Realm{" "}
+          <a className="mono" href={gnowebPage()} target="_blank" rel="noopener noreferrer" aria-label={config.realmPath} title={config.realmPath}>
+            <span className="path-full">{config.realmPath}</span>
+            <span className="path-short" aria-hidden="true">
+              {config.realmPath.replace(/g1[0-9a-z]{38}/, (a) => shortAddr(a))}
+            </span>
           </a>
         </p>
         <PriceFootnote />

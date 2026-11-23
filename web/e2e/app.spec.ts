@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { HOSTILE_DETAILS, HOSTILE_REASON, HOSTILE_TITLE } from "./hostile.mjs";
+import { BOX_ROLES, collect, HEIGHT_ROLES, layout, PAGES, TEXT_ROLES, type Sample } from "./audit";
 
 const APP = process.env.QM_APP_URL!;
 const REALM = process.env.QM_REALM!;
@@ -222,7 +223,7 @@ test("dollar hint: shown next to GNOT, live in the post form, never in a transac
   await open(page, "/");
   const stats = page.locator(".stats");
   await expect(stats).toContainText("38.234567GNOT locked≈ $4.74"); // 38.234567 × 0.124
-  await expect(page.locator("table.quests tbody tr").first().locator("[data-usd]")).toHaveText(/^≈ \$\d+\.\d\d/);
+  await expect(page.locator("table.quests tbody tr").first().locator("td.num [data-usd]")).toHaveText(/^≈ \$\d+\.\d\d/);
   await expect(page.locator("[data-usd]").first()).toHaveAttribute("title", /mainnet GNOT price \(\$0\.124 per GNOT, CoinGecko, fetched .+\)\. Test GNOT has no real value\./);
   await expect(page.locator("footer [data-price-note]")).toContainText("Dollar figures are approximate");
 
@@ -426,6 +427,63 @@ test("positioning: for people and AI agents, with example quests", async ({ page
   await expect(page.locator("main")).toContainText("No write was run.");
 });
 
+// Sizing guard: the same kind of thing has the same size on every page, per
+// breakpoint (see the tokens in src/styles.css). A new one-off size fails here.
+for (const width of [390, 1280]) {
+  test(`sizing: one value per role on every page at ${width} px`, async ({ browser }) => {
+    test.setTimeout(180_000);
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce" });
+    await mockPrice(ctx);
+    const page = await ctx.newPage();
+    const samples: Sample[] = [];
+    const problems: string[] = [];
+    for (const p of PAGES) {
+      await page.goto(`${APP}#${p.route}`);
+      await page.locator("main h1, main .state-box").first().waitFor();
+      await page.waitForLoadState("networkidle");
+      if (p.prep) await p.prep(page);
+      await page.waitForTimeout(150);
+      samples.push(...(await collect(page, p.name, width, "light")));
+      const l = await layout(page);
+      if (l.overflowX > 0) problems.push(`${p.name}: page is ${l.overflowX}px wider than the screen`);
+      if (width < 700) for (const t of l.smallTargets) problems.push(`${p.name}: tap target under 44px: ${t}`);
+    }
+    await ctx.close();
+    const byRole = new Map<string, Sample[]>();
+    for (const s of samples) byRole.set(s.role, [...(byRole.get(s.role) ?? []), s]);
+    const check = (role: string, what: string, key: (s: Sample) => string) => {
+      const values = new Map<string, string>();
+      for (const s of byRole.get(role) ?? []) if (!values.has(key(s))) values.set(key(s), `${s.cls}@${s.page}`);
+      if (values.size > 1) problems.push(`${role} ${what}: ${[...values].map(([v, w]) => `${v} (${w})`).join(" | ")}`);
+    };
+    for (const role of byRole.keys()) {
+      // Selects ignore line-height, so inputs compare size and weight only.
+      if (TEXT_ROLES(role)) check(role, "text", (s) => (role === "input/select" ? `${s.fontSize}/${s.fontWeight}` : `${s.fontSize}/${s.lineHeight}/${s.fontWeight}`));
+      if (HEIGHT_ROLES.has(role)) check(role, "height", (s) => String(Math.round(s.height)));
+      if (BOX_ROLES.has(role)) check(role, "box", (s) => `${s.padding} r${s.radius} b${s.border}`);
+    }
+    expect(problems).toEqual([]);
+  });
+}
+
+test("no horizontal overflow at 360 px", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const ctx = await browser.newContext({ viewport: { width: 360, height: 800 }, reducedMotion: "reduce" });
+  await mockPrice(ctx);
+  const page = await ctx.newPage();
+  const over: string[] = [];
+  for (const p of PAGES) {
+    await page.goto(`${APP}#${p.route}`);
+    await page.locator("main h1, main .state-box").first().waitFor();
+    await page.waitForLoadState("networkidle");
+    if (p.prep) await p.prep(page);
+    const l = await layout(page);
+    if (l.overflowX > 0) over.push(`${p.name}:${l.overflowX}`);
+  }
+  await ctx.close();
+  expect(over).toEqual([]);
+});
+
 test("keyboard: skip link and focusable controls", async ({ page }) => {
   await open(page, "/");
   await page.keyboard.press("Tab");
@@ -446,6 +504,8 @@ for (const scheme of ["light", "dark"] as const) {
         ["/quest/4", "quest-submitted"],
         ["/quest/5", "quest-closing"],
         ["/quest/1", "quest-paid"],
+        ["/quest/2", "quest-cancelled"],
+        ["/paid", "paid"],
         ["/quest/7", "quest-hostile"],
         ["/post", "post"],
         ["/how", "how"],

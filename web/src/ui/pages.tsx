@@ -173,7 +173,7 @@ export function AddressPage({ address, query }: { address: string; query: URLSea
         <>
           <p className="mono wrap muted">{address}</p>
           <RecordPanel address={address} />
-          <h2 className="tabs-title">Quests</h2>
+          <h2>Quests</h2>
           <div className="tabs" role="tablist">
             <a role="tab" aria-selected={as === "poster"} className={as === "poster" ? "tab active" : "tab"} href={`#/address/${address}?as=poster`}>
               Posted
@@ -396,9 +396,11 @@ function ActionItem({ q, o, onDone }: { q: Quest; o: ActionOption; onDone: (hash
             </button>
           </div>
         ) : (
-          <button className="btn" aria-expanded={open} onClick={() => setOpen(!open)} disabled={disabled}>
-            {open ? "Hide" : "Do this"}
-          </button>
+          <div className="action-buttons">
+            <button className="btn" aria-expanded={open} onClick={() => setOpen(!open)} disabled={disabled}>
+              {open ? "Hide" : "Do this"}
+            </button>
+          </div>
         )}
       </div>
       {open && (
@@ -504,7 +506,7 @@ export function Post() {
       </form>
 
       <div className="cost" aria-label="What leaves your wallet">
-        <h2>What leaves your wallet</h2>
+        <h2 className="card-title">What leaves your wallet</h2>
         <ul>
           <li>
             The reward: <strong>{r.ugnot !== null ? gnot(r.ugnot) : "?"} GNOT</strong>

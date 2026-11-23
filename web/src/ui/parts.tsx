@@ -140,10 +140,10 @@ export function QuestTable({ quests, show }: { quests: Quest[]; show: "open" | "
           <tr>
             <th scope="col" className="num">#</th>
             <th scope="col">Quest</th>
-            <th scope="col" className="num">Reward</th>
+            <th scope="col" className="num hide-sm">Reward</th>
             {show === "open" && <th scope="col" className="hide-sm">Work window</th>}
             {show === "paid" && <th scope="col" className="hide-sm">Builder</th>}
-            {show === "any" && <th scope="col">State</th>}
+            {show === "any" && <th scope="col" className="hide-sm">State</th>}
             {show !== "paid" && <th scope="col" className="num hide-sm">Rejected</th>}
           </tr>
         </thead>
@@ -153,8 +153,13 @@ export function QuestTable({ quests, show }: { quests: Quest[]; show: "open" | "
               <td className="num muted">{q.id.toString()}</td>
               <td className="title-cell">
                 <a href={`#/quest/${q.id}`}>{q.title}</a>
+                {/* Phones: reward and state under the title, so the title gets the full width. */}
+                <span className="cell-meta show-sm">
+                  <Gnot ugnot={q.reward} />
+                  {show === "any" && <StateBadge q={q} />}
+                </span>
               </td>
-              <td className="num">
+              <td className="num hide-sm">
                 <Gnot ugnot={q.reward} usd="block" />
               </td>
               {show === "open" && <td className="hide-sm muted nowrap" title={approx(q.workBlocks)}>{thousands(q.workBlocks)} blocks</td>}
@@ -164,7 +169,7 @@ export function QuestTable({ quests, show }: { quests: Quest[]; show: "open" | "
                 </td>
               )}
               {show === "any" && (
-                <td>
+                <td className="hide-sm">
                   <StateBadge q={q} />
                 </td>
               )}

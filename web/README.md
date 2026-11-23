@@ -141,6 +141,21 @@ price used and when it was fetched.
 
 ## Design and motion
 
+**Sizing.** Every size comes from the tokens at the top of `src/styles.css`:
+a type scale by role (display, title, section, card, lead, body, small,
+micro, number, mono, code; headings and numbers step down on phones), the
+spacing scale 4/8/12/16/24/32/48, one control height (44 px; small buttons
+36 px, and 44 px on phones), card/control/inset/pill radii, one border width,
+icon sizes per context, and one content width and gutter per breakpoint
+(phone < 700 px, tablet, desktop >= 1100 px). Two checks keep it that way:
+`src/styles.test.ts` fails on raw px or font sizes outside the tokens, and
+the e2e "sizing" tests measure every page at 390 and 1280 px and fail when
+the same role (for example "section title" or "button (regular)") has more
+than one size, a page overflows at 360 px, or a phone control is under
+44 px. `QM_AUDIT=<folder> node e2e/run-e2e.mjs e2e/audit.spec.ts` writes the
+full audit (all pages, 360-1280 px, light and dark), and
+`node e2e/audit-report.mjs <folder>` turns it into a table.
+
 Colours, type sizes, spacing and motion timings are tokens at the top of
 `src/styles.css`, with a light ("parchment") and a dark theme. Headings use the
 system serif stack, body text the system sans; no web fonts are downloaded.

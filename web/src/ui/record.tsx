@@ -134,13 +134,13 @@ export function RecordPanel({ address }: { address: string }) {
   return (
     <section className="record" aria-label="Track record">
       <div className="record-card" data-record-card="poster">
-        <h2>As poster</h2>
+        <h2 className="card-title">As poster</h2>
         {p.status === "loading" && <RecordSkeleton />}
         {p.status === "error" && <p className="muted">The record could not be read right now.</p>}
         {p.status === "ready" && <PosterFacts r={p.rec} />}
       </div>
       <div className="record-card" data-record-card="builder">
-        <h2>As builder</h2>
+        <h2 className="card-title">As builder</h2>
         {b.status === "loading" && <RecordSkeleton />}
         {b.status === "error" && <p className="muted">The record could not be read right now.</p>}
         {b.status === "ready" && <BuilderFacts r={b.rec} />}
