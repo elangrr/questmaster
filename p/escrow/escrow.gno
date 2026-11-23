@@ -7,10 +7,12 @@
 // the current block height as arguments, so the rules can be tested without a
 // chain and cannot be bypassed by the caller's own logic.
 //
-// Moves that release money (Approve, ClaimPayout, Cancel) return a Payout
-// telling the realm exactly whom to pay and how much. The quest is already in
-// a final state (Paid or Cancelled) when the Payout is returned, and a final
-// quest accepts no further move, so a quest can produce at most one Payout.
+// Moves that can release money (Cancel, Unclaim, Release, Approve, Reject,
+// ClaimPayout) return a Payout telling the realm exactly whom to pay and how
+// much; a zero Payout (Due() == false) means no coins move. A non-zero Payout
+// is only ever returned together with a move into a final state (Paid or
+// Cancelled), and a final quest accepts no further move, so a quest can
+// produce at most one non-zero Payout.
 //
 // A realm using this package must:
 //   - lock exactly Reward() in its own balance before calling NewQuest,
@@ -22,12 +24,21 @@
 //	(none)    Post (NewQuest)  anyone                        -> Open
 //	Open      Claim            anyone except the poster      -> Claimed
 //	Open      Cancel           poster                        -> Cancelled  refund Reward to poster
+//	Claimed   Cancel ("close") poster                        -> Claimed, closing
+//	Submitted Cancel ("close") poster                        -> Submitted, closing
 //	Claimed   Submit(link)     builder, until work deadline  -> Submitted
-//	Claimed   Unclaim          builder                       -> Open
-//	Claimed   Release          anyone, after work deadline   -> Open
+//	Claimed   Unclaim          builder                       -> Open (closing: Cancelled, refund)
+//	Claimed   Release          anyone, after work deadline   -> Open (closing: Cancelled, refund)
 //	Submitted Approve          poster                        -> Paid       pay Reward to builder
-//	Submitted Reject(reason)   poster, until review deadline -> Open
+//	Submitted Reject(reason)   poster, until review deadline -> Open (closing: Cancelled, refund)
 //	Submitted ClaimPayout      builder, after review deadline-> Paid       pay Reward to builder
+//
+// Closing: a poster cannot take the reward back while a builder holds the
+// quest, but can close it. The current builder keeps every right (submit,
+// get approved, claim the timeout payout); any move that would put the quest
+// back to Open ends it instead and refunds the poster. So a builder can hold
+// a closing quest for at most one work window, and nobody can re-claim it.
+// Closing cannot be undone.
 //
 // Deadlines are block heights. "Until" a deadline includes the deadline block
 // itself; "after" a deadline starts at the next block.
@@ -57,9 +68,9 @@ const (
 	MaxWorkBlocks int64 = 2_200_000
 
 	// ReviewBlocks is the fixed review window every quest gets after Submit,
-	// about 3 days. If the poster neither approves nor rejects within it, the
+	// about 7 days. If the poster neither approves nor rejects within it, the
 	// builder may call ClaimPayout.
-	ReviewBlocks int64 = 75_000
+	ReviewBlocks int64 = 172_800
 )
 
 // State is the stage a quest is in.
@@ -121,12 +132,18 @@ func (k PayoutKind) String() string {
 	return "Unknown"
 }
 
-// Payout is the transfer a realm must make after a successful final move.
-// Amount is always the quest's stored Reward.
+// Payout is the transfer a realm must make after a successful move. The zero
+// Payout means no transfer. When Due, Amount is always the quest's stored
+// Reward.
 type Payout struct {
 	Kind   PayoutKind
 	To     address
 	Amount int64
+}
+
+// Due reports whether coins must move.
+func (p Payout) Due() bool {
+	return p.Kind != 0
 }
 
 // Errors returned by the moves. Realms usually panic with err.Error().
@@ -157,6 +174,7 @@ var (
 	ErrWorkDeadlineNotPassed   = errors.New("escrow: work deadline has not passed yet")
 	ErrReviewDeadlinePassed    = errors.New("escrow: review deadline has passed")
 	ErrReviewDeadlineNotPassed = errors.New("escrow: review deadline has not passed yet")
+	ErrAlreadyClosing          = errors.New("escrow: the quest is already closing")
 )
 
 // Quest is one bounty. Its fields are private so that only the moves below
@@ -177,6 +195,8 @@ type Quest struct {
 
 	rejectCount      int
 	lastRejectReason string
+
+	closing bool // set by Cancel on a Claimed or Submitted quest
 }
 
 // NewQuest validates a new quest and returns it in the Open state. The caller
@@ -234,17 +254,30 @@ func (q *Quest) Claim(actor address, height int64) error {
 	return nil
 }
 
-// Cancel lets the poster close an Open quest. The returned Payout refunds the
-// reward to the poster.
+// Cancel is the poster's way out.
+//   - On an Open quest it ends the quest at once: Cancelled, and the returned
+//     Payout refunds the reward to the poster.
+//   - On a Claimed or Submitted quest it only marks the quest as closing and
+//     returns a zero Payout: the current builder keeps every right, and the
+//     reward goes back to the poster when the builder's turn ends without
+//     approval (Unclaim, Release or Reject). A second call fails.
 func (q *Quest) Cancel(actor address, height int64) (Payout, error) {
-	if q.state != Open {
+	switch q.state {
+	case Open, Claimed, Submitted:
+	default:
 		return Payout{}, ErrWrongState
 	}
 	if actor != q.poster {
 		return Payout{}, ErrNotPoster
 	}
-	q.state = Cancelled
-	return Payout{Kind: RefundPoster, To: q.poster, Amount: q.reward}, nil
+	if q.state == Open {
+		return q.cancel(), nil
+	}
+	if q.closing {
+		return Payout{}, ErrAlreadyClosing
+	}
+	q.closing = true
+	return Payout{}, nil
 }
 
 // Submit lets the builder hand in a work link, up to and including the work
@@ -271,32 +304,33 @@ func (q *Quest) Submit(actor address, link string, height int64) error {
 	return nil
 }
 
-// Unclaim lets the builder give a Claimed quest back. It becomes Open again.
-func (q *Quest) Unclaim(actor address, height int64) error {
+// Unclaim lets the builder give a Claimed quest back. It becomes Open again,
+// or, if it is closing, Cancelled with a refund to the poster.
+func (q *Quest) Unclaim(actor address, height int64) (Payout, error) {
 	if q.state != Claimed {
-		return ErrWrongState
+		return Payout{}, ErrWrongState
 	}
 	if actor != q.builder {
-		return ErrNotBuilder
+		return Payout{}, ErrNotBuilder
 	}
-	q.reopen()
-	return nil
+	return q.endTurn(), nil
 }
 
-// Release lets anyone reopen a Claimed quest once the work deadline has
-// passed (from WorkDeadline()+1 on) without a submission.
-func (q *Quest) Release(actor address, height int64) error {
+// Release lets anyone end the builder's turn on a Claimed quest once the
+// work deadline has passed (from WorkDeadline()+1 on) without a submission.
+// The quest becomes Open again, or, if it is closing, Cancelled with a refund
+// to the poster.
+func (q *Quest) Release(actor address, height int64) (Payout, error) {
 	if q.state != Claimed {
-		return ErrWrongState
+		return Payout{}, ErrWrongState
 	}
 	if !actor.IsValid() {
-		return ErrInvalidActor
+		return Payout{}, ErrInvalidActor
 	}
 	if height <= q.WorkDeadline() {
-		return ErrWorkDeadlineNotPassed
+		return Payout{}, ErrWorkDeadlineNotPassed
 	}
-	q.reopen()
-	return nil
+	return q.endTurn(), nil
 }
 
 // Approve lets the poster accept the submitted work. The returned Payout pays
@@ -314,26 +348,25 @@ func (q *Quest) Approve(actor address, height int64) (Payout, error) {
 }
 
 // Reject lets the poster refuse the submitted work, up to and including the
-// review deadline block. The quest becomes Open again, the builder is cleared,
-// and the reject count and last reason are kept on the quest for everyone to
-// see.
-func (q *Quest) Reject(actor address, reason string, height int64) error {
+// review deadline block. The builder is cleared, and the reject count and
+// last reason are kept on the quest for everyone to see. The quest becomes
+// Open again, or, if it is closing, Cancelled with a refund to the poster.
+func (q *Quest) Reject(actor address, reason string, height int64) (Payout, error) {
 	if q.state != Submitted {
-		return ErrWrongState
+		return Payout{}, ErrWrongState
 	}
 	if actor != q.poster {
-		return ErrNotPoster
+		return Payout{}, ErrNotPoster
 	}
 	if height > q.ReviewDeadline() {
-		return ErrReviewDeadlinePassed
+		return Payout{}, ErrReviewDeadlinePassed
 	}
 	if err := ValidateReason(reason); err != nil {
-		return err
+		return Payout{}, err
 	}
 	q.rejectCount++
 	q.lastRejectReason = reason
-	q.reopen()
-	return nil
+	return q.endTurn(), nil
 }
 
 // ClaimPayout lets the builder take the reward when the poster has not
@@ -353,13 +386,26 @@ func (q *Quest) ClaimPayout(actor address, height int64) (Payout, error) {
 	return Payout{Kind: PayBuilder, To: q.builder, Amount: q.reward}, nil
 }
 
-// reopen clears the builder and the work and puts the quest back to Open.
-func (q *Quest) reopen() {
-	q.state = Open
+// endTurn ends the current builder's turn: it clears the builder and the
+// work, then puts the quest back to Open, or, if it is closing, cancels it
+// and returns the refund.
+func (q *Quest) endTurn() Payout {
 	q.builder = ""
 	q.workLink = ""
 	q.claimedAt = 0
 	q.submittedAt = 0
+	if q.closing {
+		return q.cancel()
+	}
+	q.state = Open
+	return Payout{}
+}
+
+// cancel ends the quest and returns the refund to the poster. It is the only
+// place that returns a RefundPoster payout.
+func (q *Quest) cancel() Payout {
+	q.state = Cancelled
+	return Payout{Kind: RefundPoster, To: q.poster, Amount: q.reward}
 }
 
 // WorkDeadline is the last block at which the builder may submit. It is 0
@@ -406,6 +452,11 @@ func (q *Quest) ClaimedAt() int64         { return q.claimedAt }
 func (q *Quest) SubmittedAt() int64       { return q.submittedAt }
 func (q *Quest) RejectCount() int         { return q.rejectCount }
 func (q *Quest) LastRejectReason() string { return q.lastRejectReason }
+
+// Closing reports whether the poster has closed the quest while a builder
+// held it: the reward returns to the poster when the builder's turn ends
+// without approval.
+func (q *Quest) Closing() bool { return q.closing }
 
 // HoldsFunds reports whether the quest's reward is still held in escrow
 // (Open, Claimed or Submitted). The sum of Reward() over quests that hold

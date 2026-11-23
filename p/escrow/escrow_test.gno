@@ -2,6 +2,7 @@ package escrow
 
 import (
 	"chain"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -20,6 +21,17 @@ const (
 )
 
 // --- helpers ---
+
+var errUnexpectedPayout = errors.New("test: unexpected payout")
+
+// nopay turns a (Payout, error) move into an error, failing on any payout:
+// for moves that must not release money (quests that are not closing).
+func nopay(p Payout, err error) error {
+	if err == nil && p.Due() {
+		return errUnexpectedPayout
+	}
+	return err
+}
 
 func mustErr(t *testing.T, want, got error, what string) {
 	t.Helper()
@@ -156,12 +168,12 @@ func TestTextAllowed(t *testing.T) {
 	_, err := NewQuest(1, poster, "Fix | table [link](x) — ünïcode 日本", "line 1\nline 2\ttab", reward, workBlocks, h0)
 	mustOK(t, err, "title punctuation, details with newline")
 	q := newSubmitted(t)
-	mustOK(t, q.Reject(poster, "first line\nsecond line", h0+30), "reason with newline")
+	mustOK(t, nopay(q.Reject(poster, "first line\nsecond line", h0+30)), "reason with newline")
 }
 
 // The window constants are pinned so a change is a deliberate, reviewed edit.
 func TestWindowConstants(t *testing.T) {
-	if MinWorkBlocks != 1_000 || MaxWorkBlocks != 2_200_000 || ReviewBlocks != 75_000 {
+	if MinWorkBlocks != 1_000 || MaxWorkBlocks != 2_200_000 || ReviewBlocks != 172_800 {
 		t.Fatalf("window constants changed: min %d max %d review %d", MinWorkBlocks, MaxWorkBlocks, ReviewBlocks)
 	}
 }
@@ -209,7 +221,7 @@ func TestClaimedSubmit(t *testing.T) {
 
 func TestClaimedUnclaim(t *testing.T) {
 	q := newClaimed(t)
-	mustOK(t, q.Unclaim(builder, h0+15), "Unclaim")
+	mustOK(t, nopay(q.Unclaim(builder, h0+15)), "Unclaim")
 	mustState(t, q, Open)
 	if q.Builder() != "" || q.ClaimedAt() != 0 || q.WorkDeadline() != 0 {
 		t.Fatalf("unclaim must clear builder")
@@ -220,7 +232,7 @@ func TestClaimedUnclaim(t *testing.T) {
 
 func TestClaimedRelease(t *testing.T) {
 	q := newClaimed(t)
-	mustOK(t, q.Release(stranger, q.WorkDeadline()+1), "Release")
+	mustOK(t, nopay(q.Release(stranger, q.WorkDeadline()+1)), "Release")
 	mustState(t, q, Open)
 	if q.Builder() != "" {
 		t.Fatalf("release must clear builder")
@@ -240,7 +252,7 @@ func TestSubmittedApprove(t *testing.T) {
 
 func TestSubmittedReject(t *testing.T) {
 	q := newSubmitted(t)
-	mustOK(t, q.Reject(poster, "missing tests", h0+30), "Reject")
+	mustOK(t, nopay(q.Reject(poster, "missing tests", h0+30)), "Reject")
 	mustState(t, q, Open)
 	if q.Builder() != "" || q.WorkLink() != "" || q.SubmittedAt() != 0 {
 		t.Fatalf("reject must clear builder and work")
@@ -251,7 +263,7 @@ func TestSubmittedReject(t *testing.T) {
 	// count keeps going up over several rounds
 	mustOK(t, q.Claim(builder2, h0+40), "claim 2")
 	mustOK(t, q.Submit(builder2, "https://example.com/2", h0+41), "submit 2")
-	mustOK(t, q.Reject(poster, "still wrong", h0+42), "reject 2")
+	mustOK(t, nopay(q.Reject(poster, "still wrong", h0+42)), "reject 2")
 	if q.RejectCount() != 2 || q.LastRejectReason() != "still wrong" {
 		t.Fatalf("second reject: %d %q", q.RejectCount(), q.LastRejectReason())
 	}
@@ -305,12 +317,12 @@ func TestClaimPayoutDeadline(t *testing.T) {
 func TestRejectDeadline(t *testing.T) {
 	q := newSubmitted(t)
 	d := q.ReviewDeadline()
-	mustErr(t, ErrReviewDeadlinePassed, q.Reject(poster, "late", d+1), "reject at d+1")
+	mustErr(t, ErrReviewDeadlinePassed, nopay(q.Reject(poster, "late", d+1)), "reject at d+1")
 	mustState(t, q, Submitted)
-	mustOK(t, q.Reject(poster, "on time", d), "reject at d")
+	mustOK(t, nopay(q.Reject(poster, "on time", d)), "reject at d")
 
 	q = newSubmitted(t)
-	mustOK(t, q.Reject(poster, "early", q.ReviewDeadline()-1), "reject at d-1")
+	mustOK(t, nopay(q.Reject(poster, "early", q.ReviewDeadline()-1)), "reject at d-1")
 }
 
 // Approve stays possible after the review deadline (it pays the builder either way).
@@ -326,7 +338,7 @@ func TestReleaseDeadline(t *testing.T) {
 	q := newClaimed(t)
 	d := q.WorkDeadline()
 	for _, h := range []int64{q.ClaimedAt(), d - 1, d} {
-		mustErr(t, ErrWorkDeadlineNotPassed, q.Release(stranger, h), "release early")
+		mustErr(t, ErrWorkDeadlineNotPassed, nopay(q.Release(stranger, h)), "release early")
 		if q.CanRelease(h) {
 			t.Fatalf("CanRelease(%d) must be false", h)
 		}
@@ -335,7 +347,7 @@ func TestReleaseDeadline(t *testing.T) {
 	if !q.CanRelease(d + 1) {
 		t.Fatalf("CanRelease(d+1) must be true")
 	}
-	mustOK(t, q.Release(stranger, d+1), "release at d+1")
+	mustOK(t, nopay(q.Release(stranger, d+1)), "release at d+1")
 	mustState(t, q, Open)
 }
 
@@ -355,10 +367,10 @@ func TestSubmitDeadline(t *testing.T) {
 func TestReleaseByAnyone(t *testing.T) {
 	for _, who := range []address{poster, builder, stranger} {
 		q := newClaimed(t)
-		mustOK(t, q.Release(who, q.WorkDeadline()+1), "release by "+who.String())
+		mustOK(t, nopay(q.Release(who, q.WorkDeadline()+1)), "release by "+who.String())
 	}
 	q := newClaimed(t)
-	mustErr(t, ErrInvalidActor, q.Release("", q.WorkDeadline()+1), "release by empty")
+	mustErr(t, ErrInvalidActor, nopay(q.Release("", q.WorkDeadline()+1)), "release by empty")
 }
 
 // 6. a stranger cannot approve, reject, cancel, submit, unclaim or claim payout.
@@ -373,8 +385,8 @@ func TestStranger(t *testing.T) {
 	q = newClaimed(t)
 	mustErr(t, ErrNotBuilder, q.Submit(stranger, "https://x.io", h0+11), "stranger submit")
 	mustErr(t, ErrNotBuilder, q.Submit(poster, "https://x.io", h0+11), "poster submit")
-	mustErr(t, ErrNotBuilder, q.Unclaim(stranger, h0+11), "stranger unclaim")
-	mustErr(t, ErrNotBuilder, q.Unclaim(poster, h0+11), "poster unclaim")
+	mustErr(t, ErrNotBuilder, nopay(q.Unclaim(stranger, h0+11)), "stranger unclaim")
+	mustErr(t, ErrNotBuilder, nopay(q.Unclaim(poster, h0+11)), "poster unclaim")
 	mustState(t, q, Claimed)
 
 	q = newSubmitted(t)
@@ -382,8 +394,8 @@ func TestStranger(t *testing.T) {
 	mustErr(t, ErrNotPoster, err, "stranger approve")
 	_, err = q.Approve(builder, h0+21)
 	mustErr(t, ErrNotPoster, err, "builder approve")
-	mustErr(t, ErrNotPoster, q.Reject(stranger, "no", h0+21), "stranger reject")
-	mustErr(t, ErrNotPoster, q.Reject(builder, "no", h0+21), "builder reject")
+	mustErr(t, ErrNotPoster, nopay(q.Reject(stranger, "no", h0+21)), "stranger reject")
+	mustErr(t, ErrNotPoster, nopay(q.Reject(builder, "no", h0+21)), "builder reject")
 	_, err = q.ClaimPayout(stranger, q.ReviewDeadline()+1)
 	mustErr(t, ErrNotBuilder, err, "stranger claim payout")
 	_, err = q.ClaimPayout(poster, q.ReviewDeadline()+1)
@@ -428,16 +440,154 @@ func TestNoDoublePayout(t *testing.T) {
 }
 
 // 10. cancel after Claimed (and after Submitted) fails.
-func TestCancelAfterClaim(t *testing.T) {
-	q := newClaimed(t)
-	_, err := q.Cancel(poster, h0+11)
-	mustErr(t, ErrWrongState, err, "cancel claimed")
-	mustState(t, q, Claimed)
+// 10. cancel after Claimed or Submitted does not refund: it only closes the
+// quest (no coins move, the builder keeps their turn).
+func TestCancelAfterClaimOnlyCloses(t *testing.T) {
+	for _, q := range []*Quest{newClaimed(t), newSubmitted(t)} {
+		st := q.State()
+		p, err := q.Cancel(poster, h0+25)
+		mustOK(t, err, "close")
+		if p.Due() {
+			t.Fatalf("closing must not pay: %+v", p)
+		}
+		mustState(t, q, st)
+		if !q.Closing() || q.HoldsFunds() != true {
+			t.Fatalf("closing quest must still hold the reward")
+		}
+	}
+}
 
+// --- closing ---
+
+func newClosing(t *testing.T, mk func(*testing.T) *Quest) *Quest {
+	t.Helper()
+	q := mk(t)
+	p, err := q.Cancel(poster, h0+25)
+	mustOK(t, err, "close")
+	if p.Due() || !q.Closing() {
+		t.Fatalf("close: payout %+v closing %v", p, q.Closing())
+	}
+	return q
+}
+
+// afterRefund checks the quest ended Cancelled and refuses every move.
+func afterRefund(t *testing.T, q *Quest, p Payout, what string) {
+	t.Helper()
+	mustPayout(t, p, RefundPoster, poster, reward)
+	mustState(t, q, Cancelled)
+	if q.HoldsFunds() || q.Builder() != "" {
+		t.Fatalf("%s: cancelled quest must hold nothing and have no builder", what)
+	}
+	far := h0 + MaxWorkBlocks + ReviewBlocks + 10
+	mustErr(t, ErrWrongState, q.Claim(builder2, far), what+": claim again")
+	_, err := q.Cancel(poster, far)
+	mustErr(t, ErrWrongState, err, what+": cancel again")
+	_, err = q.Approve(poster, far)
+	mustErr(t, ErrWrongState, err, what+": approve after refund")
+	_, err = q.ClaimPayout(builder, far)
+	mustErr(t, ErrWrongState, err, what+": payout after refund")
+	_, err = q.Release(stranger, far)
+	mustErr(t, ErrWrongState, err, what+": release after refund")
+}
+
+func TestCloseThenUnclaimRefunds(t *testing.T) {
+	q := newClosing(t, newClaimed)
+	p, err := q.Unclaim(builder, h0+30)
+	mustOK(t, err, "unclaim while closing")
+	afterRefund(t, q, p, "unclaim")
+}
+
+// A squatter holds a closing quest until the work deadline; then anyone can
+// end it and the refund goes to the poster, not to the caller.
+func TestCloseThenReleaseRefundsPoster(t *testing.T) {
+	q := newClosing(t, newClaimed)
+	_, err := q.Release(stranger, q.WorkDeadline())
+	mustErr(t, ErrWorkDeadlineNotPassed, err, "release at deadline")
+	mustState(t, q, Claimed)
+	p, err := q.Release(stranger, q.WorkDeadline()+1)
+	mustOK(t, err, "release after deadline")
+	afterRefund(t, q, p, "release")
+}
+
+func TestCloseThenRejectRefunds(t *testing.T) {
+	q := newClosing(t, newSubmitted)
+	p, err := q.Reject(poster, "junk", h0+30)
+	mustOK(t, err, "reject while closing")
+	afterRefund(t, q, p, "reject")
+	if q.RejectCount() != 1 || q.LastRejectReason() != "junk" {
+		t.Fatalf("reject while closing must still be recorded")
+	}
+}
+
+// The builder who holds a closing quest keeps every right.
+func TestCloseKeepsBuilderRights(t *testing.T) {
+	q := newClosing(t, newClaimed)
+	mustOK(t, q.Submit(builder, "https://example.com/w", h0+30), "submit while closing")
+	p, err := q.Approve(poster, h0+31)
+	mustOK(t, err, "approve while closing")
+	mustPayout(t, p, PayBuilder, builder, reward)
+	mustState(t, q, Paid)
+
+	q = newClosing(t, newSubmitted)
+	p, err = q.ClaimPayout(builder, q.ReviewDeadline()+1)
+	mustOK(t, err, "timeout payout while closing")
+	mustPayout(t, p, PayBuilder, builder, reward)
+	mustState(t, q, Paid)
+}
+
+func TestCloseRules(t *testing.T) {
+	q := newClaimed(t)
+	_, err := q.Cancel(stranger, h0+20)
+	mustErr(t, ErrNotPoster, err, "stranger close")
+	_, err = q.Cancel(builder, h0+20)
+	mustErr(t, ErrNotPoster, err, "builder close")
+	if q.Closing() {
+		t.Fatalf("refused close must not mark the quest")
+	}
+	q = newClosing(t, newClaimed)
+	_, err = q.Cancel(poster, h0+26)
+	mustErr(t, ErrAlreadyClosing, err, "close twice")
+	if newOpen(t).Closing() {
+		t.Fatalf("open quest is not closing")
+	}
+	// cancelling an Open quest is immediate and never "closing"
+	o := newOpen(t)
+	p, err := o.Cancel(poster, h0+1)
+	mustOK(t, err, "cancel open")
+	if o.Closing() {
+		t.Fatalf("open cancel must not set closing")
+	}
+	mustPayout(t, p, RefundPoster, poster, reward)
+}
+
+// Without closing, the moves that reopen a quest never pay.
+func TestReopenMovesNeverPay(t *testing.T) {
+	q := newClaimed(t)
+	mustOK(t, nopay(q.Unclaim(builder, h0+11)), "unclaim")
+	mustState(t, q, Open)
+	q = newClaimed(t)
+	mustOK(t, nopay(q.Release(stranger, q.WorkDeadline()+1)), "release")
+	mustState(t, q, Open)
 	q = newSubmitted(t)
-	_, err = q.Cancel(poster, h0+21)
-	mustErr(t, ErrWrongState, err, "cancel submitted")
-	mustState(t, q, Submitted)
+	mustOK(t, nopay(q.Reject(poster, "no", h0+21)), "reject")
+	mustState(t, q, Open)
+}
+
+// The timeout rule, documented: a builder who submits anything (even junk)
+// is paid after the review window if the poster does nothing. A reject at the
+// last block of the window prevents it.
+func TestJunkSubmissionTimeout(t *testing.T) {
+	q := newClaimed(t)
+	mustOK(t, q.Submit(builder, "https://x", h0+11), "junk submit")
+	p, err := q.ClaimPayout(builder, q.ReviewDeadline()+1)
+	mustOK(t, err, "silent poster")
+	mustPayout(t, p, PayBuilder, builder, reward)
+
+	q = newClaimed(t)
+	mustOK(t, q.Submit(builder, "https://x", h0+11), "junk submit")
+	mustOK(t, nopay(q.Reject(poster, "junk", q.ReviewDeadline())), "reject at the last block")
+	_, err = q.ClaimPayout(builder, q.SubmittedAt()+ReviewBlocks+1)
+	mustErr(t, ErrWrongState, err, "no payout after reject")
 }
 
 // 11. text over the limits fails; a link without https:// fails.
@@ -468,11 +618,11 @@ func TestLinkAndReasonValidation(t *testing.T) {
 	mustOK(t, q.Submit(builder, "https://"+strings.Repeat("a", MaxLinkLen-len("https://")), h0+20), "link at max")
 
 	q = newSubmitted(t)
-	mustErr(t, ErrReasonEmpty, q.Reject(poster, "", h0+30), "empty reason")
-	mustErr(t, ErrReasonEmpty, q.Reject(poster, " \t", h0+30), "blank reason")
-	mustErr(t, ErrReasonTooLong, q.Reject(poster, strings.Repeat("r", MaxReasonLen+1), h0+30), "long reason")
+	mustErr(t, ErrReasonEmpty, nopay(q.Reject(poster, "", h0+30)), "empty reason")
+	mustErr(t, ErrReasonEmpty, nopay(q.Reject(poster, " \t", h0+30)), "blank reason")
+	mustErr(t, ErrReasonTooLong, nopay(q.Reject(poster, strings.Repeat("r", MaxReasonLen+1), h0+30)), "long reason")
 	mustState(t, q, Submitted)
-	mustOK(t, q.Reject(poster, strings.Repeat("r", MaxReasonLen), h0+30), "reason at max")
+	mustOK(t, nopay(q.Reject(poster, strings.Repeat("r", MaxReasonLen), h0+30)), "reason at max")
 }
 
 // --- at least one illegal move from every state (rule 8) ---
@@ -488,17 +638,17 @@ func TestIllegalMovesPerState(t *testing.T) {
 		{"Claim", func(q *Quest) error { return q.Claim(builder2, far) }},
 		{"Cancel", func(q *Quest) error { return pay(q.Cancel(poster, far)) }},
 		{"Submit", func(q *Quest) error { return q.Submit(q.Builder(), "https://x.io", q.ClaimedAt()+1) }},
-		{"Unclaim", func(q *Quest) error { return q.Unclaim(q.Builder(), far) }},
-		{"Release", func(q *Quest) error { return q.Release(stranger, far) }},
+		{"Unclaim", func(q *Quest) error { return nopay(q.Unclaim(q.Builder(), far)) }},
+		{"Release", func(q *Quest) error { return nopay(q.Release(stranger, far)) }},
 		{"Approve", func(q *Quest) error { return pay(q.Approve(poster, far)) }},
-		{"Reject", func(q *Quest) error { return q.Reject(poster, "no", q.SubmittedAt()+1) }},
+		{"Reject", func(q *Quest) error { return nopay(q.Reject(poster, "no", q.SubmittedAt()+1)) }},
 		{"ClaimPayout", func(q *Quest) error { return pay(q.ClaimPayout(q.Builder(), far)) }},
 	}
 	// allowed moves per state (section 4); everything else must be ErrWrongState
 	allowed := map[State]map[string]bool{
 		Open:      {"Claim": true, "Cancel": true},
-		Claimed:   {"Submit": true, "Unclaim": true, "Release": true},
-		Submitted: {"Approve": true, "Reject": true, "ClaimPayout": true},
+		Claimed:   {"Submit": true, "Unclaim": true, "Release": true, "Cancel": true},
+		Submitted: {"Approve": true, "Reject": true, "ClaimPayout": true, "Cancel": true},
 		Paid:      {},
 		Cancelled: {},
 	}
@@ -554,10 +704,10 @@ func TestHeldFundsAccounting(t *testing.T) {
 	mustOK(t, c.Submit(builder, "https://x.io", h0+2), "c submit")
 	pay(c.ClaimPayout(builder, c.ReviewDeadline()+1))
 	mustOK(t, d.Claim(builder, h0+1), "d claim")
-	mustOK(t, d.Release(stranger, d.WorkDeadline()+1), "d release")
+	mustOK(t, nopay(d.Release(stranger, d.WorkDeadline()+1)), "d release")
 	mustOK(t, e.Claim(builder2, h0+1), "e claim")
 	mustOK(t, e.Submit(builder2, "https://x.io", h0+2), "e submit")
-	mustOK(t, e.Reject(poster, "no", h0+3), "e reject")
+	mustOK(t, nopay(e.Reject(poster, "no", h0+3)), "e reject")
 
 	sum := int64(0)
 	for _, q := range qs {
