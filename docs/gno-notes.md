@@ -13,6 +13,7 @@ gno repo at that tag.
 | Build needs Go 1.25.9 (`go.mod`); `GOTOOLCHAIN=go1.25.9 make install.gno install.gnodev` fetches it | confirmed | `go.mod` |
 | `gno fmt` has `-w` and `-diff` (no `-l`) | confirmed | `gno fmt -h` |
 | `gno lint` and `gno test ./...` need a `gnowork.toml` at the repo root (empty file) | confirmed | docs/resources/configuring-gno-projects.md |
+| `gno` downloads missing dependencies (e.g. `p/nt/avl/v0`, `p/nt/uassert/v0`) from the chain into `$GNOHOME/pkg/mod`. The default `GNOHOME` is `~/.config/gno`, which is also gnokey's default key folder, so set `GNOHOME` to a separate folder when running the tools. The downloaded `avl` code was checked identical to the v1.8.0 examples. | confirmed | `gno env`, observed |
 
 ## Section 2 of the plan
 
@@ -43,5 +44,64 @@ What the docs say:
 Change before deployment:
 
 1. `p/escrow/gnomod.toml`: `module = "gno.land/p/<namespace>/escrow"`.
-2. `r/questmaster/gnomod.toml` (later task): its `module` line, and its import of `gno.land/p/<namespace>/escrow`.
+2. `r/questmaster/gnomod.toml`: its `module` line. `r/questmaster/questmaster.gno`, `questmaster_test.gno` and `filetests/*`: the import of the escrow package and the realm path (also the expected `pkg_path` in the events filetest; regenerate with `gno test -update-golden-tests`).
 3. Any import of the escrow package in tests or docs (`grep -rn questmaster_dev .`).
+
+## Block time and window constants (measured 2026-11-23, read-only RPC)
+
+| Network | Blocks | From | To | Seconds per block |
+|---|---|---|---|---|
+| Onyx (`onyx-1`) | 1,293,717 to 1,343,717 (50,000) | 2026-11-21T05:29:53Z | 2026-11-23T05:04:18Z | 3.425 |
+| Onyx | 1,333,717 to 1,343,717 (10,000) | 2026-11-22T19:33:39Z | 2026-11-23T05:04:18Z | 3.424 |
+| Mainnet (`gnoland-1`) | 1,705,927 to 1,755,927 (50,000) | 2026-11-21T03:43:56Z | 2026-11-23T05:04:17Z | 3.552 |
+| Mainnet | 1,745,927 to 1,755,927 (10,000) | 2026-11-22T19:18:13Z | 2026-11-23T05:04:17Z | 3.516 |
+
+Source: `/status` and `/block?height=` on `https://rpc.onyx.testnets.gno.land:443` and `https://rpc.gno.land:443`.
+Assumed block time for the constants: 3.5 s.
+
+| Constant (p/escrow) | Target | Maths at 3.5 s | Chosen | Real time at 3.42 s / 3.55 s |
+|---|---|---|---|---|
+| `MinWorkBlocks` | about 1 hour | 3,600 / 3.5 = 1,029 | 1,000 | 57 min / 59 min |
+| `ReviewBlocks` | about 3 days | 259,200 / 3.5 = 74,057 | 75,000 | 2.97 d / 3.08 d |
+| `MaxWorkBlocks` | about 90 days | 7,776,000 / 3.5 = 2,221,714 | 2,200,000 | 87 d / 90 d |
+
+The block time can change with chain upgrades, so the README should state windows in blocks with the
+approximate time.
+
+## Realm caller and payment guard (v1.8.0)
+
+- Every state-changing function in `r/questmaster` requires `cur.Previous().IsUserCall()` (a direct
+  `gnokey maketx call`) and takes the actor from `cur.Previous().Address()`. Sources:
+  docs/resources/effective-gno.md ("use `IsUserCall()` instead of `IsUser()`"),
+  docs/resources/gno-security-guide.md and gno-ai-contract-review.md ("Payment-guarded entry points use
+  `cur.Previous().IsUserCall()`").
+- `IsUserCall()` is false for other realms and for `maketx run` scripts (they run as the ephemeral realm
+  `gno.land/e/<addr>/run`), so it already rules out MsgRun.
+- `runtime.AssertOriginCall()` is **not** added. effective-gno.md says it "rejects `testing.NewUserRealm`-based
+  unit tests in some configurations"; tried here, it makes every realm test and the filetest fail with
+  "invalid non-origin call". Since `IsUserCall()` alone is the documented payment guard and already refuses
+  realms and MsgRun, adding it would only make the realm untestable.
+
+## Test harness facts (v1.8.0), learned while writing the realm tests
+
+- Realm tests have the form `func TestX(cur realm, t *testing.T)` and call the realm as `F(cross(cur), ...)`.
+- `testing.SetRealm` changes the realm of the frame that calls it, so it must be called in the same function
+  that then does `cross(cur)`, not in a shared helper.
+- A panic does **not** roll back realm state in `gno test` (checked with a test-only function that wrote a
+  variable and then panicked). On chain, the whole transaction reverts. The tests therefore snapshot all
+  state before each failing call and check that it is unchanged.
+- Bank balances reset between test functions; realm variables do not. Tests reset the realm's variables at
+  the start.
+- `testing.SetOriginSend` only sets what `unsafe.OriginSend()` returns; it moves no coins.
+  `testing.IssueCoins(realmAddress, coins)` simulates the deposit that `-send` makes on chain.
+- `uassert.Equal` does not accept custom types such as `escrow.State` or `address`: compare `.String()`.
+- In filetests, an `// Events:` block is checked when it is non-empty; `gno test -update-golden-tests`
+  writes the actual events.
+- A function may take a `realm` as a non-first parameter, but it must not be named `cur`.
+
+## Local check with gnodev
+
+`gnodev local -txs-file <file>` replays genesis transactions with no signature, and their signers are
+premined, so a `PostQuest` call can be checked without creating or importing any key. gnodev keeps its
+built-in test1 key in `<-home>/data/keys.db`; `-home` defaults to `GNOHOME`, so keep that pointed at a
+throwaway folder.
