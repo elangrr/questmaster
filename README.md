@@ -11,7 +11,14 @@ QuestMaster is a bounty board for small tasks, paid in GNOT, running on Gno.land
 > - Demo video: `TODO-DEPLOY: video URL`
 > - Source: https://github.com/elangrr/questmaster
 
-Contents: [Tour](#a-one-minute-tour) · [How to use it](#how-to-use-it) · [Rules](#the-rules) · [Costs](#what-it-costs) · [Safety](#safety) · [Use the escrow in your realm](#using-pescrow-in-your-own-realm) · [Run it locally](#run-it-locally) · [Layout and roadmap](#project-layout) · [Licence](#licence-and-credits)
+Contents: [Web app](#web-app) · [Tour](#a-one-minute-tour) · [How to use it](#how-to-use-it) · [Rules](#the-rules) · [Costs](#what-it-costs) · [Safety](#safety) · [Use the escrow in your realm](#using-pescrow-in-your-own-realm) · [Run it locally](#run-it-locally) · [Layout and roadmap](#project-layout) · [Licence](#licence-and-credits)
+
+## Web app
+
+A friendlier front door than gnoweb: browse the board, read quests, and post, take, submit and review with the Adena wallet, all in the browser. It is a static site that reads the realm straight from the Onyx node; every action also shows the equivalent `gnokey` command and gnoweb form.
+
+- Web app: `TODO-DEPLOY: web app URL`
+- Code, tests and hosting notes: [`web/`](web/README.md); a hands-on checklist with Adena: [`web/TESTING.md`](web/TESTING.md).
 
 ## A one-minute tour
 
@@ -278,6 +285,7 @@ r/questmaster/            realm: storage, coins, public functions, events, pages
   *_test.gno, filetests/  tests, golden pages, events
 scripts/local-flow.sh     full flow on a local node
 scripts/set-namespace.sh  replace the placeholder namespace before deploying
+web/                      the web app (static site, Adena wallet)
 docs/                     plan, deployment steps, demo script, Gno notes
 LICENSE, NOTICE            Apache License 2.0 for QuestMaster's own code; third-party notice
 ```
