@@ -30,6 +30,7 @@ fi
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${OUT:-$(mktemp -d)}"
+mkdir -p "$OUT"
 export GNOHOME="$(mktemp -d)" # throwaway: gnodev keeps its built-in test key here
 RPC_PORT=36657
 WEB_PORT=38888
