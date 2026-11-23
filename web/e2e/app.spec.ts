@@ -466,6 +466,78 @@ for (const width of [390, 1280]) {
   });
 }
 
+// Forms: every label sits the same distance above its control, controls side
+// by side share one top and height, and their first hint lines start level.
+async function formGeometry(page: Page) {
+  return page.evaluate(() => {
+    const box = (e: Element | null) => (e ? e.getBoundingClientRect() : null);
+    const fields = Array.from(document.querySelectorAll<HTMLElement>("main .field")).map((f) => {
+      const label = box(f.querySelector(".field-label"));
+      const control = box(f.querySelector("input, select, textarea"));
+      const hint = box(f.querySelector(".usd-block, .field-hint"));
+      return {
+        name: f.querySelector(".field-label")?.textContent ?? "?",
+        gap: label && control ? Math.round((control.top - label.bottom) * 10) / 10 : null,
+        controlTop: control?.top ?? null,
+        hintGap: control && hint ? Math.round((hint.top - control.bottom) * 10) / 10 : null,
+      };
+    });
+    const rows = Array.from(document.querySelectorAll<HTMLElement>("main .form-row, main .inline-form")).map((r) => {
+      const controls = Array.from(r.querySelectorAll<HTMLElement>("input, select, button")).map((c) => {
+        const b = c.getBoundingClientRect();
+        return { tag: c.tagName.toLowerCase(), top: b.top, height: b.height, left: b.left };
+      });
+      const hints = Array.from(r.querySelectorAll<HTMLElement>(":scope > .field")).map((f) => box(f.querySelector(".usd-block, .field-hint"))?.top ?? null);
+      return { cls: r.className, controls, hints };
+    });
+    return { fields, rows };
+  });
+}
+
+for (const width of [1280, 768, 390]) {
+  test(`forms line up at ${width} px: label gaps, control tops and heights, first hints`, async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce" });
+    await mockPrice(ctx);
+    const page = await ctx.newPage();
+    const problems: string[] = [];
+    const gaps = new Map<number, string>();
+    const visits: [string, string, ((p: Page) => Promise<void>)?][] = [
+      ["post", "/post"],
+      ["address", `/address/${BUILDER}`],
+      ["submit link", "/quest/3", async (p) => void (await p.locator(".action").filter({ has: p.locator("strong", { hasText: /^Submit work$/ }) }).getByRole("button", { name: "Other ways" }).click())],
+      ["reject reason", "/quest/4", async (p) => void (await p.locator(".action").filter({ has: p.locator("strong", { hasText: /^Reject the work$/ }) }).getByRole("button", { name: "Other ways" }).click())],
+    ];
+    for (const [name, route, prep] of visits) {
+      await page.goto(`${APP}#${route}`);
+      await page.locator("main h1").first().waitFor();
+      await page.waitForLoadState("networkidle");
+      if (prep) await prep(page);
+      await page.waitForTimeout(200);
+      const g = await formGeometry(page);
+      for (const f of g.fields) if (f.gap !== null && !gaps.has(f.gap)) gaps.set(f.gap, `${name}: ${f.name}`);
+      for (const r of g.rows) {
+        // Controls on the same line (same left-to-right band) must share top and height.
+        const sideBySide = r.controls.filter((c) => Math.abs(c.top - r.controls[0].top) < 20);
+        if (sideBySide.length > 1) {
+          const tops = sideBySide.map((c) => c.top);
+          const heights = sideBySide.map((c) => c.height);
+          if (Math.max(...tops) - Math.min(...tops) > 0.5) problems.push(`${name} ${r.cls}: control tops differ ${tops.map((t) => t.toFixed(1)).join(" / ")}`);
+          if (Math.max(...heights) - Math.min(...heights) > 0.5) problems.push(`${name} ${r.cls}: control heights differ ${heights.map((h) => h.toFixed(1)).join(" / ")}`);
+        }
+        const hints = r.hints.filter((h): h is number => h !== null);
+        const fieldsSideBySide = r.cls.includes("form-row") && width >= 700;
+        if (fieldsSideBySide && hints.length > 1 && Math.max(...hints) - Math.min(...hints) > 0.5)
+          problems.push(`${name} ${r.cls}: first hint lines start at ${hints.map((h) => h.toFixed(1)).join(" / ")}`);
+      }
+      for (const c of g.rows.flatMap((r) => r.controls)) if (c.tag !== "button" && Math.abs(c.height - 44) > 0.5) problems.push(`${name}: ${c.tag} is ${c.height}px tall`);
+    }
+    console.log(`FORMS ${width}px: label-to-control gaps ${[...gaps].map(([g, w]) => `${g}px (first seen: ${w})`).join(", ")}`);
+    if (gaps.size > 1) problems.push(`label-to-control gaps differ: ${[...gaps].map(([g, w]) => `${g}px (${w})`).join(" | ")}`);
+    await ctx.close();
+    expect(problems).toEqual([]);
+  });
+}
+
 test("no horizontal overflow at 360 px", async ({ browser }) => {
   test.setTimeout(120_000);
   const ctx = await browser.newContext({ viewport: { width: 360, height: 800 }, reducedMotion: "reduce" });

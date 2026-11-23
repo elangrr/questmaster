@@ -558,7 +558,10 @@ table.quests { width: 100%; border-collapse: collapse; }
 .form { display: grid; gap: var(--s-4); margin: var(--s-4) 0; }
 .form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4); }
 @media (max-width: 699px) { .form-row { grid-template-columns: minmax(0, 1fr); } }
-.field { display: grid; gap: var(--s-1); }
+/* align-content: start keeps label, control and hints packed at the top when a form row
+   stretches a shorter field to the height of its neighbour (otherwise the grid spreads the
+   spare height over its rows and pushes the control down). */
+.field { display: grid; gap: var(--s-1); align-content: start; }
 .field-label { font-size: var(--fs-body); font-weight: var(--fw-semibold); }
 .field-hint { color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
 .field-error { color: var(--danger); font-size: var(--fs-small); line-height: var(--lh-small); margin: var(--s-1) 0 0; animation: enter 200ms var(--ease) both; }
