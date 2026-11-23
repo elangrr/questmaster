@@ -17,7 +17,8 @@ Run everything from the repository root, on the branch that has the final code. 
 
 ```sh
 # The code is final: tests, lint and the local real-node flow all pass.
-GNOHOME=$HOME/.gno-builder gno test ./... && GNOHOME=$HOME/.gno-builder gno lint ./... && scripts/local-flow.sh
+export GNOHOME=$(mktemp -d)   # a throwaway folder, never the folder that holds keys
+gno test ./... && gno lint ./... && scripts/local-flow.sh
 
 # The key's address and balance (about 300 GNOT; the two deploys need about 15).
 gnokey list -home "$HOME/.gno-questmaster"

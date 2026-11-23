@@ -310,7 +310,7 @@ Cheapest reductions (not done; estimates from the table):
 
 ## Why this follows the Gno docs
 
-Each safety property, with the doc rule it follows (docs at v1.8.0, `~/src/gno/docs`):
+Each safety property, with the doc rule it follows (the `docs/` folder of github.com/gnolang/gno at v1.8.0):
 
 | Property | How QuestMaster does it | Doc rule |
 |---|---|---|

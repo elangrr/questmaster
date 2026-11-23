@@ -5,6 +5,7 @@ QuestMaster is a bounty board for small tasks, paid in GNOT, running on Gno.land
 > **Status: Onyx testnet (`onyx-1`), test GNOT only.** Nothing here uses real money.
 >
 > - Live board: https://onyx.testnets.gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster (live once the deploy is approved on Onyx)
+> - Web app: https://elangrr.github.io/questmaster/
 > - Escrow package: https://onyx.testnets.gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow
 > - Example quest: `TODO-DEPLOY: quest page URL`
 > - Example transactions on GnoScan: `TODO-DEPLOY: post tx`, `TODO-DEPLOY: approve tx`, `TODO-DEPLOY: cancel tx`
@@ -17,7 +18,7 @@ Contents: [Web app](#web-app) · [Tour](#a-one-minute-tour) · [How to use it](#
 
 A friendlier front door than gnoweb: browse the board, read quests, and post, take, submit and review with the Adena wallet, all in the browser. It is a static site that reads the realm straight from the Onyx node; every action also shows the equivalent `gnokey` command and gnoweb form. When you sign with Adena, the wallet chooses the network fee and shows it before you sign.
 
-- Web app: `TODO-DEPLOY: web app URL`
+- Web app: https://elangrr.github.io/questmaster/
 - Code, tests and hosting notes: [`web/`](web/README.md); a hands-on checklist with Adena: [`web/TESTING.md`](web/TESTING.md).
 
 ## A one-minute tour

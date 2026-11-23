@@ -64,8 +64,8 @@ rewrite rules.
    that branch in **Settings → Pages**, or add a GitHub Actions workflow that
    runs the build and uses `actions/upload-pages-artifact` +
    `actions/deploy-pages` with `path: web/dist`.
-4. The site appears at `https://<user>.github.io/<repo>/`. Put that link in
-   the root README (`TODO-DEPLOY: web app URL`).
+4. The site appears at `https://<user>.github.io/<repo>/`. QuestMaster's copy is at
+   https://elangrr.github.io/questmaster/ (linked from the root README).
 
 Any other static host works the same way: upload `dist/`.
 
