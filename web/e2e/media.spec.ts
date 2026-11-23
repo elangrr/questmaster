@@ -48,7 +48,7 @@ test("video: opening a quest", async ({ browser }) => {
     await page.goto(`${APP}#/`);
     await expect(page.locator("table.quests tbody tr")).toHaveCount(20);
     await page.waitForTimeout(1200);
-    await page.getByRole("link", { name: "Older →" }).click();
+    await page.getByRole("link", { name: "Older" }).click();
     await page.waitForTimeout(1000);
     await page.goto(`${APP}#/quest/4`);
     await page.locator(".stepper").waitFor();

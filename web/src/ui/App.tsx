@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import { config, gnowebPage } from "../config";
+import { Icon } from "./icons";
 import { shortAddr } from "../lib/format";
 import { useRoute, useTheme, type Theme } from "./hooks";
 import { Agents, AddressPage, Board, How, Mine, Paid, Post, QuestPage } from "./pages";
@@ -30,9 +32,36 @@ function Routes() {
   );
 }
 
-/** Re-mounts on each route so the page fades in once (no motion under reduced motion). */
+/** The document title for a route (screen readers announce it on navigation). */
+function titleFor(path: string): string {
+  const site = "QuestMaster";
+  let m: RegExpExecArray | null;
+  if (path === "/" || path === "") return `${site} · small tasks, paid in GNOT`;
+  const fixed: Record<string, string> = { "/paid": "Paid quests", "/post": "Post a quest", "/how": "How it works", "/agents": "For AI agents", "/mine": "My quests" };
+  if (fixed[path]) return `${fixed[path]} · ${site}`;
+  if ((m = /^\/quest\/(\d+)$/.exec(path))) return `Quest ${m[1]} · ${site}`;
+  if ((m = /^\/address\/(g1[0-9a-z]{38})$/.exec(path))) return `${shortAddr(m[1])} · ${site}`;
+  return `Page not found · ${site}`;
+}
+
+/**
+ * Re-mounts on each route so the page fades in once (no motion under reduced
+ * motion). On every route change after the first: new title, back to the top,
+ * and focus on the main region so keyboard and screen-reader users land on the
+ * new page instead of an unmounted link.
+ */
 function PageFrame() {
   const { path } = parse(useRoute());
+  const first = useRef(true);
+  useEffect(() => {
+    document.title = titleFor(path);
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    window.scrollTo(0, 0);
+    document.getElementById("main")?.focus({ preventScroll: true });
+  }, [path]);
   return (
     <div key={path} className="page-enter">
       <Routes />
@@ -82,7 +111,7 @@ function ThemeToggle() {
   const next: Record<Theme, Theme> = { system: "light", light: "dark", dark: "system" };
   return (
     <button className="btn btn-small btn-ghost" onClick={() => setTheme(next[theme])} aria-label={`Theme: ${theme}. Change theme`} title={`Theme: ${theme}`}>
-      {theme === "dark" ? "☾" : theme === "light" ? "☀" : "◐"}
+      <Icon name={theme === "dark" ? "moon" : theme === "light" ? "sun" : "auto"} />
     </button>
   );
 }
@@ -91,7 +120,15 @@ function Shell() {
   const w = useWallet();
   return (
     <>
-      <a className="skip" href="#main">
+      {/* Hash routing: a plain #main link would change the route, so focus the region directly. */}
+      <a
+        className="skip"
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault();
+          document.getElementById("main")?.focus();
+        }}
+      >
         Skip to content
       </a>
       <header className="top">
@@ -130,12 +167,10 @@ function Shell() {
         <PageFrame />
       </main>
       <footer className="foot">
+        <div className="foot-inner">
         <p>
           Built on <a href="https://gno.land" target="_blank" rel="noopener noreferrer">gno.land</a> ·{" "}
-          <a href={config.sourceUrl} target="_blank" rel="noopener noreferrer">Source</a>
-        </p>
-        <p>
-          Realm{" "}
+          <a href={config.sourceUrl} target="_blank" rel="noopener noreferrer">Source</a> · Realm{" "}
           <a className="mono" href={gnowebPage()} target="_blank" rel="noopener noreferrer" aria-label={config.realmPath} title={config.realmPath}>
             <span className="path-full">{config.realmPath}</span>
             <span className="path-short" aria-hidden="true">
@@ -143,8 +178,9 @@ function Shell() {
             </span>
           </a>
         </p>
-        <PriceFootnote />
         <p className="muted">Not an official Gno.land product. Testnet only: {config.networkName} ({config.chainId}), test GNOT.</p>
+        <PriceFootnote />
+        </div>
       </footer>
     </>
   );

@@ -44,7 +44,7 @@ test("board: totals, 20 open quests newest first, paging", async ({ page }) => {
   await expect(rows).toHaveCount(20);
   await expect(rows.first()).toContainText("Small task 24");
   await expect(page.locator(".pager")).toContainText("Page 1 of 2");
-  await page.getByRole("link", { name: "Older →" }).click();
+  await page.getByRole("link", { name: "Older" }).click();
   await expect(page).toHaveURL(/#\/\?page=2$/);
   await expect(rows).toHaveCount(5);
   await expect(rows.last()).toContainText(HOSTILE_TITLE);
@@ -366,14 +366,14 @@ test("track record: summaries on the quest page, caution before claiming", async
   const claim = page.locator(".action", { hasText: "Take this quest" });
   await claim.getByRole("button", { name: "Other ways" }).click();
   await expect(claim.locator('[data-poster-note="caution"]')).toHaveText(
-    /^!This poster has rejected work 3 times on 2 quests, and 2 quests were refunded to them after a rejection\. A poster can turn down work/,
+    /^This poster has rejected work 3 times on 2 quests, and 2 quests were refunded to them after a rejection\. A poster can turn down work/,
   );
 
   // Quest 34: a clean poster (paid, never rejected) and a builder with history.
   await open(page, "/quest/34");
   const clean = page.locator('[data-record="poster"]');
   await expect(clean).toContainText("Paid 1 of 1 finished quest · never rejected work");
-  await expect(clean.locator(".rec-mark.good")).toHaveText("✓");
+  await expect(clean.locator(".rec-mark.good svg.icon")).toHaveCount(1);
   await expect(page.locator('[data-record="builder"]')).toContainText("Paid for 1 of 2 quests taken · 1 in progress");
 });
 
@@ -419,7 +419,7 @@ test("positioning: for people and AI agents, with example quests", async ({ page
   await open(page, "/how");
   await expect(page.locator(".examples li")).toHaveText(examples.map((e) => `“${e}”`));
   await expect(page.locator("main")).toContainText("A poster can turn down finished work and take the reward back");
-  await expect(page.locator("main")).toContainText("check the poster's record before you claim");
+  await expect(page.locator("main")).toContainText("check the poster's record before you take a quest");
   await open(page, "/post");
   expect(examples).toContain(await page.getByLabel("Title").getAttribute("placeholder"));
   await open(page, "/agents");
@@ -537,6 +537,127 @@ for (const width of [1280, 768, 390]) {
     expect(problems).toEqual([]);
   });
 }
+
+// Design pass guards (task 14).
+const DESIGN_PAGES = ["/", "/quest/4", "/quest/31", `/address/${OTHER}`, "/how", "/post", "/agents"];
+
+test("design: no one-sided borders or side bars on boxes", async ({ page }) => {
+  const found: string[] = [];
+  for (const route of DESIGN_PAGES) {
+    await open(page, route);
+    await page.locator("main h1").first().waitFor();
+    await page.waitForLoadState("networkidle");
+    found.push(
+      ...(await page.evaluate((route) => {
+        const out: string[] = [];
+        for (const el of Array.from(document.querySelectorAll<HTMLElement>("main *"))) {
+          const cs = getComputedStyle(el);
+          const widths = [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth].map((w) => parseFloat(w));
+          const styles = [cs.borderTopStyle, cs.borderRightStyle, cs.borderBottomStyle, cs.borderLeftStyle];
+          const sides = widths.filter((w, i) => w > 0 && styles[i] !== "none").length;
+          const rounded = parseFloat(cs.borderTopLeftRadius) > 0 || parseFloat(cs.borderBottomLeftRadius) > 0;
+          // A single vertical side (left or right) on a rounded box is the "side bar" habit.
+          const vertical = (widths[1] > 0 && styles[1] !== "none") || (widths[3] > 0 && styles[3] !== "none");
+          if (rounded && sides === 1 && vertical) out.push(`${route}: ${el.className} has a one-sided border`);
+          for (const pseudo of ["::before", "::after"]) {
+            const p = getComputedStyle(el, pseudo);
+            if (p.content === "none" || p.position !== "absolute") continue;
+            const w = parseFloat(p.width);
+            const h = parseFloat(p.height);
+            if (w > 0 && w <= 6 && h >= el.getBoundingClientRect().height * 0.5) out.push(`${route}: ${el.className}${pseudo} is a side bar`);
+          }
+        }
+        return out;
+      }, route)),
+    );
+  }
+  expect(found).toEqual([]);
+});
+
+test("design: icons are drawn SVG in the text colour; no glyphs as icons", async ({ page }) => {
+  const problems: string[] = [];
+  for (const route of DESIGN_PAGES) {
+    await open(page, route);
+    await page.locator("main h1").first().waitFor();
+    await page.waitForLoadState("networkidle");
+    problems.push(
+      ...(await page.evaluate((route) => {
+        const out: string[] = [];
+        for (const icon of Array.from(document.querySelectorAll(".icon"))) {
+          if (icon.tagName.toLowerCase() !== "svg") out.push(`${route}: .icon is not an svg`);
+          const cs = getComputedStyle(icon);
+          if (cs.stroke !== cs.color) out.push(`${route}: icon stroke ${cs.stroke} is not currentColor ${cs.color}`);
+        }
+        const glyphs = /[◐◑☀☾☽→←↩✓✔✗!]/;
+        for (const el of Array.from(document.querySelectorAll("button, a.btn, .rec-mark, .txstep-dot, .step-dot, .nav-link"))) {
+          const own = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent ?? "").join("");
+          if (glyphs.test(own)) out.push(`${route}: glyph used as an icon in "${own.trim()}"`);
+        }
+        return out;
+      }, route)),
+    );
+  }
+  expect(problems).toEqual([]);
+});
+
+for (const width of [390, 768, 1024, 1280]) {
+  test(`design: hero diagram text is at least 12 px at ${width} px`, async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce" });
+    await mockPrice(ctx);
+    const page = await ctx.newPage();
+    await page.goto(`${APP}#/`);
+    await page.locator("[data-testid=quest-flow]").waitFor();
+    const sizes = await page.evaluate(() => {
+      const flow = document.querySelector("[data-testid=quest-flow]")!;
+      const out: number[] = [];
+      const svg = flow.querySelector<SVGSVGElement>("svg.flow-svg");
+      if (svg && svg.getBoundingClientRect().width > 0) {
+        const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+        for (const t of Array.from(svg.querySelectorAll("text"))) out.push(parseFloat(getComputedStyle(t).fontSize) * scale);
+      }
+      for (const el of Array.from(flow.querySelectorAll<HTMLElement>(".flow-list li, .flow-exits"))) {
+        if (el.getBoundingClientRect().width > 0) out.push(parseFloat(getComputedStyle(el).fontSize));
+      }
+      return out;
+    });
+    await ctx.close();
+    expect(sizes.length).toBeGreaterThan(0);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(12);
+  });
+}
+
+test("design: the quest page is not a stack of bordered cards", async ({ page }) => {
+  await open(page, "/quest/4");
+  await page.locator("main h1").waitFor();
+  await page.waitForLoadState("networkidle");
+  const boxes = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("main *")).filter((e) => {
+      const cs = getComputedStyle(e);
+      return parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== "none" && parseFloat(cs.borderTopLeftRadius) >= 8 && e.getBoundingClientRect().width > 200;
+    }).length,
+  );
+  expect(boxes).toBeLessThanOrEqual(4);
+});
+
+test("keyboard: skip link focuses the main region without changing the route", async ({ page }) => {
+  await open(page, "/quest/4");
+  await page.locator("main h1").waitFor();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("main#main")).toBeFocused();
+  await expect(page).toHaveURL(/#\/quest\/4$/);
+  await expect(page.locator("main h1")).toHaveText("Add a dark theme to the demo page");
+});
+
+test("navigation sets the page title and moves focus to the new page", async ({ page }) => {
+  await open(page, "/");
+  await expect(page).toHaveTitle("QuestMaster · small tasks, paid in GNOT");
+  await page.getByRole("link", { name: "Small task 24" }).click();
+  await expect(page).toHaveTitle("Quest 31 · QuestMaster");
+  await expect(page.locator("main#main")).toBeFocused();
+  await page.getByRole("link", { name: "How it works" }).first().click();
+  await expect(page).toHaveTitle("How it works · QuestMaster");
+});
 
 test("no horizontal overflow at 360 px", async ({ browser }) => {
   test.setTimeout(120_000);

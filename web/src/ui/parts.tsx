@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Icon } from "./icons";
 import { gnowebPage, pkgStatusPage } from "../config";
 import { QuestState, type Quest } from "../lib/amino";
 import { approx, gnot, shortAddr, thousands } from "../lib/format";
@@ -50,12 +51,22 @@ export function CountInt({ n }: { n: number | bigint }) {
 }
 
 /** A GNOT total that counts up once; ends on the exact value. */
+/**
+ * A GNOT total that counts up once. Totals show at most 2 decimals (summary,
+ * not ledger); the exact amount is in the tooltip and for screen readers.
+ */
 export function CountGnot({ ugnot }: { ugnot: bigint }) {
   const exact = gnot(ugnot);
-  const target = Number(ugnot) / 1e6;
+  const shown = gnot(((ugnot + 5_000n) / 10_000n) * 10_000n); // nearest 0.01
+  const target = Number(shown);
   const v = useCountUp(target);
-  const decimals = exact.includes(".") ? exact.split(".")[1].length : 0;
-  return <>{v === target ? exact : v.toFixed(decimals)}</>;
+  const decimals = shown.includes(".") ? shown.split(".")[1].length : 0;
+  return (
+    <span title={`${exact} GNOT`}>
+      <span aria-hidden="true">{v === target ? shown : v.toFixed(decimals)}</span>
+      <span className="sr-only">{exact}</span>
+    </span>
+  );
 }
 
 /** An address shown short, with the full value on hover and a link to its quests. */
@@ -85,7 +96,7 @@ export function SafeLink({ url }: { url: string }) {
 /** A skeleton of the coming table, announced as "Loading…" to screen readers. */
 export function Loading({ what = "Loading" }: { what?: string }) {
   return (
-    <div className="skeleton-wrap" role="status" aria-live="polite" aria-busy="true">
+    <div className="skeleton-wrap" role="status">
       <span className="sr-only">{what}…</span>
       <SkeletonRows n={5} />
     </div>
@@ -97,7 +108,7 @@ export function ErrorBox({ error, onRetry }: { error: Error; onRetry?: () => voi
   return (
     <div className={`state-box with-art ${notLive ? "waiting" : "error"}`} role="alert">
       {notLive ? <WaitingArt /> : <ErrorArt />}
-      <strong>{notLive ? "Not live yet" : "Could not load this"}</strong>
+      <strong>{notLive ? "Not live yet" : "Couldn't read the chain"}</strong>
       <p>{error.message}</p>
       {notLive && (
         <p className="muted">
@@ -110,7 +121,7 @@ export function ErrorBox({ error, onRetry }: { error: Error; onRetry?: () => voi
             </>
           )}
           <a href={gnowebPage()} target="_blank" rel="noopener noreferrer">
-            gnoweb
+            Realm on gnoweb
           </a>
         </p>
       )}
@@ -188,11 +199,15 @@ export function Pager({ page, total, pageSize, base }: { page: number; total: nu
   const sep = base.includes("?") ? "&" : "?";
   return (
     <nav className="pager" aria-label="Pages">
-      {page > 1 ? <a className="btn" href={`#${base}${sep}page=${page - 1}`}>← Newer</a> : <span />}
+      {page > 1 ? <a className="btn" href={`#${base}${sep}page=${page - 1}`}>
+          <Icon name="arrow-left" /> Newer
+        </a> : <span />}
       <span className="muted">
         Page {page} of {last}
       </span>
-      {page < last ? <a className="btn" href={`#${base}${sep}page=${page + 1}`}>Older →</a> : <span />}
+      {page < last ? <a className="btn" href={`#${base}${sep}page=${page + 1}`}>
+          Older <Icon name="arrow-right" />
+        </a> : <span />}
     </nav>
   );
 }

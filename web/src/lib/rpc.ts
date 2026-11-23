@@ -55,16 +55,16 @@ export async function abciQuery(path: string, data: string, fetchFn: typeof fetc
   }
   if (res.status === 403)
     throw new ReadError("network", `The node at ${config.rpcUrl} does not allow these read queries (HTTP 403). Set VITE_RPC_URL to a node that does.`);
-  if (!res.ok) throw new ReadError("network", `The node answered with HTTP ${res.status}.`);
+  if (!res.ok) throw new ReadError("network", `The node had a problem (HTTP ${res.status}). Try again in a moment.`);
   let json: any;
   try {
     json = await res.json();
   } catch {
-    throw new ReadError("network", "The node sent a response that is not JSON.");
+    throw new ReadError("network", "The node sent a response that is not JSON. Try again in a moment.");
   }
   if (json.error) throw new ReadError("network", `The node returned an error: ${String(json.error.message ?? json.error.data ?? "unknown")}`);
   const base = json?.result?.response?.ResponseBase;
-  if (!base) throw new ReadError("network", "The node sent an unexpected response.");
+  if (!base) throw new ReadError("network", "The node sent an unexpected response. Try again in a moment.");
   const err = base.Error;
   return {
     data: base.Data ? b64decode(base.Data) : "",

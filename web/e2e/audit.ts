@@ -32,7 +32,7 @@ export const ROLES: Record<string, string> = {
   "page title": "main h1:not(#hero-title)",
   "section title": "main h2:not(.sr-only):not(.card-title)",
   "card title": "main h3, main .card-title, main .rec-headline, main .state-box strong",
-  lead: "main .lead, main .hero p",
+  lead: "main .lead, main .hero [data-enter] > p",
   body: "main .prose p:not(.muted):not(.small):not(.lead), main .plain, main .action-explain, main .callout, main .rec-note, main .state-box p, main .step-card p, main .rule-card p, main .facts dd, main table.quests td",
   "small/muted": "main .small, main .field-hint, main .field-error, main .crumbs, main .rec-line, main .hero-fact, main .deadline-head, main .txstep",
   "step label": "main .step",
@@ -54,7 +54,7 @@ export const ROLES: Record<string, string> = {
   "logo mark": "header .mark",
   "step dot": "main .step-dot",
   "small icon": "main .rec-mark, main .txstep-dot, main .callout-icon",
-  card: "main .stat, main .action, main .record-card, main .step-card, main .rule-card, main .deadline, main .plain, main .cost, main .prompt, main .hero-visual, main .state-box",
+  card: "main .stat, main .record-card, main .step-card, main .rule-card, main .plain, main .cost, main .prompt, main .hero-visual, main .state-box",
   inset: "main .callout, main .rec-note, main .ok, main pre.cmd:not(.code-card .cmd), main .txstep, main .rec-stat",
 };
 

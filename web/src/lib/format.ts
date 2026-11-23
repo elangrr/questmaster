@@ -24,9 +24,11 @@ export function parseGnot(input: string): bigint | null {
   return BigInt(m[1]) * 1_000_000n + BigInt((m[2] ?? "").padEnd(6, "0") || "0");
 }
 
+const NUMBER = new Intl.NumberFormat("en-US");
+
 /** 1234567 -> "1,234,567". */
 export function thousands(n: bigint | number): string {
-  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return NUMBER.format(n);
 }
 
 /** Blocks -> "about 3 days" (same wording and rounding as the realm's pages). */

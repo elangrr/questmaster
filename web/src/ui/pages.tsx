@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { cloneElement, useEffect, useId, useState, type ReactNode } from "react";
+import { Icon } from "./icons";
 import { config, gnowebPage, rules } from "../config";
 import { argsFor, actionsFor, NOT_CONNECTED, roleOf, type ActionOption } from "../lib/actions";
 import { QuestState, type Quest } from "../lib/amino";
-import { approx, gnot, thousands, timeLeft, windowToBlocks, type WindowUnit } from "../lib/format";
+import { approx, gnot, thousands, windowToBlocks, type WindowUnit } from "../lib/format";
 import { read } from "../lib/rpc";
 import { checkDetails, checkLink, checkReason, checkReward, checkTitle, checkWorkBlocks } from "../lib/validate";
 import { useAsync } from "./hooks";
@@ -10,7 +11,7 @@ import { Addr, CopyButton, Empty, ErrorBox, Gnot, Loading, Pager, PlainText, Que
 import { CountGnot, CountInt } from "./parts";
 import { Usd } from "./price";
 import { PosterNote, RecordLine, RecordPanel } from "./record";
-import { DeadlineBar, QuestFlow, QuestStepper, SkeletonBoard, SkeletonQuest, StepArt } from "./visuals";
+import { DeadlineFact, QuestFlow, QuestStepper, SkeletonBoard, SkeletonQuest, StepArt } from "./visuals";
 import { TxPanel, TxSent } from "./TxPanel";
 import { useWallet } from "./WalletContext";
 
@@ -21,8 +22,8 @@ function pageFrom(query: URLSearchParams): number {
 
 export const ReviewWarning = () => (
   <div className="callout warn" role="note">
-    <strong>Posters: check your quest.</strong> If you do not approve or reject a submission within the review window ({approx(rules.reviewBlocks)}),
-    the builder is paid automatically.
+    <strong>Answer every submission within {approx(rules.reviewBlocks)}.</strong> If you don't approve or reject it in time, the builder is paid
+    automatically.
   </div>
 );
 
@@ -50,7 +51,7 @@ export function Board({ query }: { query: URLSearchParams }) {
           </p>
           <div className="hero-actions">
             <a className="btn btn-primary" href="#/post">
-              Post a quest <span className="arrow" aria-hidden="true">→</span>
+              Post a quest <Icon name="arrow-right" className="arrow" />
             </a>
             <a className="btn" href="#/how">
               How it works
@@ -174,14 +175,14 @@ export function AddressPage({ address, query }: { address: string; query: URLSea
           <p className="mono wrap muted">{address}</p>
           <RecordPanel address={address} />
           <h2>Quests</h2>
-          <div className="tabs" role="tablist">
-            <a role="tab" aria-selected={as === "poster"} className={as === "poster" ? "tab active" : "tab"} href={`#/address/${address}?as=poster`}>
+          <nav className="tabs" aria-label="Quests by role">
+            <a aria-current={as === "poster" ? "page" : undefined} className={as === "poster" ? "tab active" : "tab"} href={`#/address/${address}?as=poster`}>
               Posted
             </a>
-            <a role="tab" aria-selected={as === "builder"} className={as === "builder" ? "tab active" : "tab"} href={`#/address/${address}?as=builder`}>
-              Worked on
+            <a aria-current={as === "builder" ? "page" : undefined} className={as === "builder" ? "tab active" : "tab"} href={`#/address/${address}?as=builder`}>
+              Taken
             </a>
-          </div>
+          </nav>
           {as === "builder" && <p className="muted">Every quest this address has taken, with its current state. A quest stays here after the builder gives it up or is rejected.</p>}
           {data.status === "loading" && <Loading />}
           {data.status === "error" && <ErrorBox error={data.error} onRetry={reload} />}
@@ -231,11 +232,11 @@ export function Mine() {
   return (
     <section>
       <h1>My quests</h1>
-      <p>Connect Adena to see the quests you posted and the ones you worked on, or type any address.</p>
+      <p>Connect a wallet to see the quests you posted and the ones you took, or type any address.</p>
       {w.installed && (
         <p>
           <button className="btn btn-primary" onClick={() => void w.connect()} disabled={w.busy}>
-            Connect Adena
+            Connect wallet
           </button>
         </p>
       )}
@@ -302,24 +303,12 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
       )}
       {q.state === QuestState.Submitted && role === "poster" && <ReviewWarning />}
 
-      {(q.state === QuestState.Claimed || q.state === QuestState.Submitted) && (
-        <div className="deadlines" aria-label="Deadlines">
-          {q.state === QuestState.Claimed && <DeadlineBar label="Work deadline" start={q.claimedAt} deadline={q.workDeadline} h={h} />}
-          {q.state === QuestState.Submitted && <DeadlineBar label="Review deadline" start={q.submittedAt} deadline={q.reviewDeadline} h={h} />}
-        </div>
-      )}
-
       <dl className="facts">
-        <div><dt>Reward</dt><dd><Gnot ugnot={q.reward} /></dd></div>
+        {q.state === QuestState.Claimed && <DeadlineFact label="Work deadline" start={q.claimedAt} deadline={q.workDeadline} h={h} />}
+        {q.state === QuestState.Submitted && <DeadlineFact label="Review deadline" start={q.submittedAt} deadline={q.reviewDeadline} h={h} />}
         <div className="fact-wide"><dt>Poster</dt><dd><Addr a={q.poster} />{role === "poster" && <span className="you">you</span>}<RecordLine address={q.poster} role="poster" /></dd></div>
         {q.builder && <div className="fact-wide"><dt>Builder</dt><dd><Addr a={q.builder} />{role === "builder" && <span className="you">you</span>}<RecordLine address={q.builder} role="builder" /></dd></div>}
         <div><dt>Work window</dt><dd>{thousands(q.workBlocks)} blocks ({approx(q.workBlocks)})</dd></div>
-        {q.state === QuestState.Claimed && (
-          <div><dt>Work deadline</dt><dd>block {thousands(q.workDeadline)} ({timeLeft(q.workDeadline, h)})</dd></div>
-        )}
-        {q.state === QuestState.Submitted && (
-          <div><dt>Review deadline</dt><dd>block {thousands(q.reviewDeadline)} ({timeLeft(q.reviewDeadline, h)})</dd></div>
-        )}
         {q.workLink && <div><dt>Work</dt><dd><SafeLink url={q.workLink} /></dd></div>}
         <div><dt>Times rejected</dt><dd>{q.rejectCount}</dd></div>
         <div><dt>Posted at block</dt><dd>{thousands(q.createdAt)}</dd></div>
@@ -333,7 +322,7 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
 
       {q.rejectCount > 0 && (
         <section>
-          <h2>Last reject reason</h2>
+          <h2>Last rejection reason</h2>
           <PlainText text={q.lastRejectReason} />
         </section>
       )}
@@ -392,7 +381,7 @@ function ActionItem({ q, o, onDone }: { q: Quest; o: ActionOption; onDone: (hash
               </a>
             )}
             <button className="btn btn-ghost-text" aria-expanded={open} onClick={() => setOpen(!open)}>
-              {open ? "Hide" : "Other ways"}
+              {open ? "Hide" : "Other ways to sign"}
             </button>
           </div>
         ) : (
@@ -408,12 +397,12 @@ function ActionItem({ q, o, onDone }: { q: Quest; o: ActionOption; onDone: (hash
           {o.func === "ClaimQuest" && <PosterNote address={q.poster} />}
           {o.input === "link" && (
             <Field label="Link to the work" hint={`Starts with https://, at most ${rules.maxLinkLen} characters.`} error={input ? problem : null}>
-              <input className="input mono" value={input} onChange={(e) => setInput(e.target.value)} placeholder="https://" spellCheck={false} />
+              <input className="input mono" type="url" name="work-link" autoComplete="off" value={input} onChange={(e) => setInput(e.target.value)} placeholder="https://" spellCheck={false} />
             </Field>
           )}
           {o.input === "reason" && (
-            <Field label="Why do you reject it?" hint={`Shown publicly on the quest. At most ${rules.maxReasonLen} characters.`} error={input ? problem : null}>
-              <textarea className="input" rows={3} value={input} onChange={(e) => setInput(e.target.value)} />
+            <Field label="Reason for rejecting" hint={`Shown publicly on the quest. At most ${rules.maxReasonLen} characters.`} error={input ? problem : null}>
+              <textarea className="input" name="reject-reason" rows={3} value={input} onChange={(e) => setInput(e.target.value)} />
             </Field>
           )}
           <TxPanel
@@ -430,15 +419,34 @@ function ActionItem({ q, o, onDone }: { q: Quest; o: ActionOption; onDone: (hash
   );
 }
 
-function Field({ label, hint, error, extra, children }: { label: string; hint?: string; error?: string | null; extra?: ReactNode; children: React.ReactElement }) {
+/** A labelled control. Hint and error sit outside the label and are linked with aria-describedby. */
+function Field({ label, hint, error, extra, children }: { label: string; hint?: string; error?: string | null; extra?: ReactNode; children: React.ReactElement<Record<string, unknown>> }) {
+  const id = useId();
+  const hintId = hint ? `${id}-hint` : undefined;
+  const errorId = error ? `${id}-error` : undefined;
+  const control = cloneElement(children, {
+    id,
+    "aria-describedby": [hintId, errorId].filter(Boolean).join(" ") || undefined,
+    "aria-invalid": error ? true : undefined,
+  });
   return (
-    <label className="field">
-      <span className="field-label">{label}</span>
-      {children}
+    <div className="field">
+      <label className="field-label" htmlFor={id}>
+        {label}
+      </label>
+      {control}
       {extra}
-      {hint && <span className="field-hint">{hint}</span>}
-      {error && <span className="field-error">{error}</span>}
-    </label>
+      {hint && (
+        <span className="field-hint" id={hintId}>
+          {hint}
+        </span>
+      )}
+      {error && (
+        <span className="field-error" id={errorId}>
+          {error}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -479,34 +487,38 @@ export function Post() {
       <ReviewWarning />
       <form onSubmit={(e) => e.preventDefault()} className="form">
         <Field label="Title" hint={`One line, at most ${rules.maxTitleLen} characters (${Array.from(title).length} used).`} error={title ? errs.title : null}>
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder={example} />
+          <input className="input" name="title" autoComplete="off" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder={example} />
         </Field>
         <Field label="Details" hint={`What should the builder do, and how will you judge it? At most ${rules.maxDetailsLen} characters (${Array.from(details).length} used).`} error={errs.details}>
-          <textarea className="input" rows={5} value={details} onChange={(e) => setDetails(e.target.value)} />
+          <textarea className="input" name="details" rows={5} value={details} onChange={(e) => setDetails(e.target.value)} />
         </Field>
         <div className="form-row">
           <Field label="Reward (GNOT)" hint="At least 1 GNOT." extra={<Usd ugnot={r.ugnot} block />} error={errs.reward}>
-            <input className="input num" inputMode="decimal" value={reward} onChange={(e) => setReward(e.target.value)} />
+            <input className="input num" name="reward" autoComplete="off" inputMode="decimal" value={reward} onChange={(e) => setReward(e.target.value)} />
           </Field>
           <div className="field">
             <span className="field-label" id="window-label">Work window</span>
             <div className="window-input" role="group" aria-labelledby="window-label">
-              <input className="input num" inputMode="decimal" aria-label="Work window amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              <select className="input" aria-label="Work window unit" value={unit} onChange={(e) => setUnit(e.target.value as WindowUnit)}>
+              <input className="input num" name="window-amount" autoComplete="off" inputMode="decimal" aria-label="Work window amount" aria-describedby={errs.window ? "window-hint window-error" : "window-hint"} aria-invalid={errs.window ? true : undefined} value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <select className="input" name="window-unit" aria-label="Work window unit" value={unit} onChange={(e) => setUnit(e.target.value as WindowUnit)}>
                 <option value="hours">hours</option>
                 <option value="days">days</option>
               </select>
             </div>
-            <span className="field-hint">
+            <span className="field-hint" id="window-hint">
               {Number.isFinite(blocks) && blocks > 0 ? `${thousands(blocks)} blocks at about ${rules.blockMillis / 1000} s each. ` : ""}From 1 hour to about 89 days.
             </span>
-            {errs.window && <span className="field-error">{errs.window}</span>}
+            {errs.window && (
+              <span className="field-error" id="window-error">
+                {errs.window}
+              </span>
+            )}
           </div>
         </div>
       </form>
 
-      <div className="cost" aria-label="What leaves your wallet">
-        <h2 className="card-title">What leaves your wallet</h2>
+      <section className="cost" aria-labelledby="cost-title">
+        <h2 className="card-title" id="cost-title">What leaves your wallet</h2>
         <ul>
           <li>
             The reward: <strong>{r.ugnot !== null ? gnot(r.ugnot) : "?"} GNOT</strong>
@@ -516,7 +528,7 @@ export function Post() {
           <li>The network fee, which Adena shows before you sign (about 0.1 GNOT with the gnokey command).</li>
         </ul>
         <p className="muted small">This is the {config.networkName} with test GNOT, not real money.</p>
-      </div>
+      </section>
 
       {posted ? (
         <>
@@ -550,10 +562,10 @@ export function How() {
     <section>
       <div className="prose">
         <h1>How it works</h1>
-        <p className="lead">Five steps, two deadlines, no admin. Everything below is enforced by the realm on chain, not by this page.</p>
+        <p className="lead">Everything below is enforced by the realm on chain, not by this page.</p>
         <h2>For people and AI agents</h2>
         <p>
-          QuestMaster does not care who does the task: a person, a person using AI, or an AI agent with its own key. What it gives is a safe payment
+          QuestMaster does not care who does the task: a person, a person using AI, or an AI agent with its own key. What it gives is a locked payment
           between strangers: the reward is locked before anyone starts, and it is paid only when the poster is satisfied, or automatically if the
           poster stays silent for the review window.
         </p>
@@ -578,7 +590,7 @@ export function How() {
         ))}
       </ol>
 
-      <h2>Two deadlines keep it fair</h2>
+      <h2>Two deadlines</h2>
       <div className="rule-cards">
         <div className="rule-card">
           <h3>Work window</h3>
@@ -602,7 +614,6 @@ export function How() {
           A poster can cancel an open quest and get the reward back at once. Once a builder has it, the poster can close it instead: the builder keeps
           their turn, and if it ends without approval the reward goes back to the poster. Nobody can take a closing quest again.
         </p>
-        <ReviewWarning />
 
         <h2>What it costs</h2>
         <ul>
@@ -611,7 +622,7 @@ export function How() {
           </li>
           <li>
             <strong>A storage deposit</strong>, kept by the chain for the data a call stores: about 0.65 to 0.8 GNOT to post, 0.2 to 0.3 GNOT for a
-            builder's first claim, about 0.1 GNOT to approve.
+            the first time a builder takes a quest, about 0.1 GNOT to approve.
           </li>
           <li>
             <strong>The network fee.</strong> Adena chooses it and shows it before you sign; the gnokey commands pay 0.1 GNOT.
@@ -639,7 +650,7 @@ export function How() {
         </p>
         <ul>
           <li>
-            <strong>Builders:</strong> check the poster's record before you claim, start with small quests, and for valuable work submit a link that
+            <strong>Builders:</strong> check the poster's record before you take a quest, start with small quests, and for valuable work submit a link that
             proves the work without handing all of it over when you can (a preview, screenshots, or a pull request the poster can review but not
             merge).
           </li>
@@ -692,7 +703,7 @@ export function Agents() {
         </p>
       </div>
 
-      <h2>1. Connect</h2>
+      <h2>Connect</h2>
       <p>Install gnomcp from the gnoverse/gno-mcp repository, then register it.</p>
       <h3>Claude Code</h3>
       <div className="code-card">
@@ -709,7 +720,7 @@ export function Agents() {
         (<span className="mono">onyx-1</span>). The realm is <span className="mono wrap">{realm}</span>.
       </p>
 
-      <h2>2. Ask</h2>
+      <h2>Ask</h2>
       <ul className="prompt-list">
         {prompts.map((p, i) => (
           <li key={p} className="prompt">
@@ -720,9 +731,9 @@ export function Agents() {
       </ul>
 
       <div className="prose">
-        <h2>3. Writes need a key you choose</h2>
+        <h2>Writes need a key</h2>
         <p>
-          Posting, claiming or approving needs a signed call. gnomcp can sign with its own testnet key (funded from the faucet, acting as a separate
+          Posting, taking or approving needs a signed call. gnomcp can sign with its own testnet key (funded from the faucet, acting as a separate
           account) or with a session you authorize yourself with gnokey, limited to this realm and a spend limit. Approving pays the builder at once
           and cannot be undone. The full guide lists exactly what was tested and where.
         </p>

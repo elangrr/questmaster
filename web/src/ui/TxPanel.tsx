@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Icon } from "./icons";
 import { config, explorerTx } from "../config";
 import { buildMsg, gnokeyCommand, gnowebActionLink, type ActionName } from "../lib/actions";
 import { invalidate, read } from "../lib/rpc";
@@ -23,9 +24,8 @@ export function WalletGate({ children }: { children: ReactNode }) {
     return (
       <p className="hint">
         <button className="btn btn-primary" onClick={() => void w.connect()} disabled={w.busy}>
-          Connect Adena
-        </button>{" "}
-        to sign this.
+          Connect wallet
+        </button>
       </p>
     );
   if (!w.onRightNetwork)
@@ -33,7 +33,7 @@ export function WalletGate({ children }: { children: ReactNode }) {
       <p className="hint warn">
         Adena is on <span className="mono">{w.chainId || "another network"}</span>.{" "}
         <button className="btn btn-primary" onClick={() => void w.switchNetwork()} disabled={w.busy}>
-          Switch to {config.networkName}
+          Switch to {config.chainId}
         </button>
       </p>
     );
@@ -85,7 +85,7 @@ export function TxPanel({ spec, onDone, note, fallbackOpen = false }: { spec: Tx
       onDone?.(r.hash, b);
     } catch (e) {
       setPhase(sent ? "confirmed" : "failed");
-      setError(e instanceof WalletError ? e.message : e instanceof Error ? e.message : "Something went wrong.");
+      setError(e instanceof WalletError ? e.message : e instanceof Error ? e.message : "Couldn't send this. Nothing was signed. Try again.");
     } finally {
       setBusy(false);
     }
@@ -115,7 +115,10 @@ export function TxPanel({ spec, onDone, note, fallbackOpen = false }: { spec: Tx
       )}
       {hash && !onDone && <TxSent hash={hash} block={block} />}
       <details className="fallback" open={fallbackOpen}>
-        <summary>No Adena? Use gnokey or gnoweb</summary>
+        <summary>
+          <Icon name="chevron" />
+          No Adena? Use gnokey or gnoweb
+        </summary>
         <p className="muted">With gnokey (replace YOUR_KEY_NAME):</p>
         <pre className="cmd">{cmd}</pre>
         <CopyButton text={cmd} label="Copy command" />
@@ -162,13 +165,13 @@ const STEPS: { key: Exclude<TxPhase, "idle" | "failed">; label: string; doing: s
 function TxSteps({ phase, block }: { phase: TxPhase; block: bigint | null }) {
   const at = phase === "failed" ? 0 : STEPS.findIndex((s) => s.key === phase);
   return (
-    <ol className="txsteps" aria-label="Transaction progress" aria-live="polite">
+    <ol className="txsteps" aria-label="Transaction progress">
       {STEPS.map((s, i) => {
         const st = phase === "failed" && i === 0 ? "failed" : i < at || phase === "confirmed" ? "done" : i === at ? "active" : "todo";
         const text = st === "active" ? s.doing : s.key === "confirmed" && st === "done" && block !== null ? `Confirmed in block ${thousands(block)}` : s.label;
         return (
           <li key={s.key} className={`txstep ${st}`} aria-current={st === "active" ? "step" : undefined}>
-            {st === "active" ? <span className="spinner" aria-hidden="true" /> : <span className="txstep-dot" aria-hidden="true">{st === "done" ? "✓" : st === "failed" ? "!" : i + 1}</span>}
+            {st === "active" ? <span className="spinner" aria-hidden="true" /> : <span className="txstep-dot" aria-hidden="true">{st === "done" ? <Icon name="check" /> : st === "failed" ? <Icon name="alert" /> : i + 1}</span>}
             <span>{text}</span>
           </li>
         );
@@ -191,7 +194,7 @@ export function TxSent({ hash, what, block = null, celebrate = false }: { hash: 
       <a className="mono" href={explorerTx(hash)} target="_blank" rel="noopener noreferrer" title={hash}>
         {hash.length > 20 ? hash.slice(0, 10) + "…" + hash.slice(-6) : hash}
       </a>{" "}
-      (opens GnoScan){block !== null ? `, confirmed in block ${thousands(block)}` : ""}. The page shows the new state.
+      (opens GnoScan){block !== null ? `, confirmed in block ${thousands(block)}` : ""}.
     </p>
   );
 }

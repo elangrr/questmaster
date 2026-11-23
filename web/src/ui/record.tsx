@@ -2,6 +2,7 @@
 // per address for the session, and fail quietly (the summary just stays empty).
 
 import { useEffect, useState } from "react";
+import { Icon } from "./icons";
 import type { Quest } from "../lib/amino";
 import {
   builderHeadline,
@@ -89,7 +90,11 @@ export function RecordLine({ address, role }: { address: string; role: Role }) {
     if (r.role === "poster") mark = posterSignal(r)?.kind ?? null;
     body = headline ? (
       <>
-        {mark && <span className={`rec-mark ${mark}`} aria-hidden="true">{mark === "good" ? "✓" : "!"}</span>}
+        {mark && (
+          <span className={`rec-mark ${mark}`} aria-hidden="true">
+            <Icon name={mark === "good" ? "check" : "alert"} />
+          </span>
+        )}
         <span>
           {headline}
           {latest(r)}
@@ -101,7 +106,7 @@ export function RecordLine({ address, role }: { address: string; role: Role }) {
     );
   }
   return (
-    <span className={`rec-line ${mark ?? ""}`} data-record={role} aria-live="polite">
+    <span className={`rec-line ${mark ?? ""}`} data-record={role}>
       {body}
     </span>
   );
@@ -116,7 +121,7 @@ export function PosterNote({ address }: { address: string }) {
   return (
     <p className={`rec-note ${sig.kind}`} data-poster-note={sig.kind}>
       <span className={`rec-mark ${sig.kind}`} aria-hidden="true">
-        {sig.kind === "good" ? "✓" : "!"}
+        <Icon name={sig.kind === "good" ? "check" : "alert"} />
       </span>
       <span>
         {sig.text}

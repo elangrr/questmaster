@@ -2,7 +2,8 @@
 // deadline bars, skeletons and small illustrations. Pure SVG + CSS; every
 // animation rests under prefers-reduced-motion (see styles.css).
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { Icon } from "./icons";
 import { QuestState, type Quest } from "../lib/amino";
 import { approx, thousands, timeLeft } from "../lib/format";
 import { useInView, usePageVisible } from "./motion";
@@ -23,43 +24,45 @@ export function Mark() {
 
 const FLOW = [
   { x: 56, label: "Post", sub: "reward locked" },
-  { x: 182, label: "Claim", sub: "builder takes it" },
+  { x: 182, label: "Take", sub: "builder starts" },
   { x: 308, label: "Submit", sub: "link to work" },
   { x: 434, label: "Approve", sub: "poster checks" },
   { x: 560, label: "Paid", sub: "to the builder" },
 ];
 
 /**
- * How a quest moves, as a small looping diagram: a coin travels along the
- * main path; the two side exits (closed and refunded, timeout payout) are
- * drawn as dashed branches. Pauses off-screen and in hidden tabs; static
- * under reduced motion.
+ * How a quest moves. Wide screens: a small looping SVG diagram (a coin
+ * travels along the main path; dashed branches show the refund and the
+ * timeout payout), with a pause button; it also pauses off-screen and in
+ * hidden tabs, and is static under reduced motion. Phones: the same steps
+ * as a short HTML list, so nothing renders at a few pixels.
  */
 export function QuestFlow() {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref);
   const visible = usePageVisible(); // both hooks always run (rules of hooks)
-  const running = inView && visible;
+  const [userPaused, setUserPaused] = useState(false);
+  const running = inView && visible && !userPaused;
   return (
     <div ref={ref} className={`flow ${running ? "" : "paused"}`} data-testid="quest-flow">
-      <svg viewBox="0 0 616 236" role="img" aria-labelledby="flow-title flow-desc">
+      <svg className="flow-svg" viewBox="0 0 616 236" role="img" aria-labelledby="flow-title flow-desc">
         <title id="flow-title">How a quest moves</title>
         <desc id="flow-desc">
-          Post, claim, submit, approve, paid. Two side exits: a closed quest refunds the poster; a submission left unanswered for about 7 days is paid
+          Post, take, submit, approve, paid. Two side exits: a closed quest refunds the poster; a submission left unanswered for about 7 days is paid
           out to the builder.
         </desc>
         <path className="flow-line" d="M56 86H560" />
         <path className="flow-line flow-progress" d="M56 86H560" pathLength={100} />
         {/* side exits */}
-        <path className="flow-branch" d="M182 100v58q0 14 14 14h52" />
-        <path className="flow-branch timeout" d="M308 100v58q0 14 14 14h224q14 0 14-14V102" />
-        <g className="flow-exit" transform="translate(268 172)">
-          <rect x="-20" y="-15" width="122" height="30" rx="15" />
-          <text x="41" y="5" textAnchor="middle">Closed · refunded</text>
+        <path className="flow-branch" d="M182 104v54q0 14 14 14h40" />
+        <path className="flow-branch timeout" d="M308 104v54q0 14 14 14h224q14 0 14-14V104" />
+        <g className="flow-exit" transform="translate(236 172)">
+          <rect x="0" y="-16" width="150" height="32" rx="16" />
+          <text x="75" y="5" textAnchor="middle">Closed · refunded</text>
         </g>
-        <g className="flow-exit timeout" transform="translate(472 172)">
-          <rect x="-58" y="-15" width="118" height="30" rx="15" />
-          <text x="1" y="5" textAnchor="middle">7 days · auto-pay</text>
+        <g className="flow-exit timeout" transform="translate(400 172)">
+          <rect x="0" y="-16" width="150" height="32" rx="16" />
+          <text x="75" y="5" textAnchor="middle">7 days · auto-pay</text>
         </g>
         {FLOW.map((n, i) => (
           <g key={n.label} className="flow-node" style={{ ["--i" as string]: i }} transform={`translate(${n.x} 86)`}>
@@ -70,7 +73,7 @@ export function QuestFlow() {
             <text className="flow-label" y="-30" textAnchor="middle">
               {n.label}
             </text>
-            <text className="flow-sub" y="40" textAnchor="middle">
+            <text className="flow-sub" y="44" textAnchor="middle">
               {n.sub}
             </text>
           </g>
@@ -80,6 +83,17 @@ export function QuestFlow() {
           <path d="M-3 0h6M0-3v6" />
         </g>
       </svg>
+      <ol className="flow-list" aria-label="How a quest moves">
+        {FLOW.map((n) => (
+          <li key={n.label}>
+            <strong>{n.label}</strong> <span>{n.sub}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="flow-exits">Exits: a closed quest refunds the poster; a submission left unanswered for about 7 days pays the builder.</p>
+      <button type="button" className="btn btn-small btn-ghost flow-toggle" onClick={() => setUserPaused(!userPaused)} aria-pressed={userPaused} aria-label={userPaused ? "Play the diagram" : "Pause the diagram"}>
+        <Icon name={userPaused ? "play" : "pause"} />
+      </button>
     </div>
   );
 }
@@ -87,7 +101,7 @@ export function QuestFlow() {
 /** The life of one quest as steps: done, current, and what can come next. */
 export function QuestStepper({ q }: { q: Quest }) {
   const cancelled = q.state === QuestState.Cancelled;
-  const steps = ["Posted", "Claimed", "Submitted", "Paid"];
+  const steps = ["Posted", "Taken", "Submitted", "Paid"];
   // index of the current step (0-based)
   const cur = { [QuestState.Open]: 0, [QuestState.Claimed]: 1, [QuestState.Submitted]: 2, [QuestState.Paid]: 3, [QuestState.Cancelled]: -1 }[q.state];
   return (
@@ -98,9 +112,7 @@ export function QuestStepper({ q }: { q: Quest }) {
           <li key={s} className={`step ${state}`} aria-current={state === "current" ? "step" : undefined}>
             <span className="step-dot" aria-hidden="true">
               {state === "done" ? (
-                <svg className="step-check" viewBox="0 0 16 16">
-                  <path d="m3.5 8.5 3 3 6-6.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <Icon name="check" />
               ) : (
                 i + 1
               )}
@@ -111,7 +123,9 @@ export function QuestStepper({ q }: { q: Quest }) {
       })}
       {cancelled && (
         <li className="step exit current" aria-current="step">
-          <span className="step-dot" aria-hidden="true">↩</span>
+          <span className="step-dot" aria-hidden="true">
+            <Icon name="undo" />
+          </span>
           <span className="step-label">Refunded</span>
         </li>
       )}
@@ -119,30 +133,30 @@ export function QuestStepper({ q }: { q: Quest }) {
   );
 }
 
-/** A deadline as a bar from its start block to its deadline block. */
-export function DeadlineBar({ label, start, deadline, h }: { label: string; start: bigint; deadline: bigint; h: bigint }) {
+/** A deadline as one fact row: label, block and time left, and a bar from its start block to the deadline. */
+export function DeadlineFact({ label, start, deadline, h }: { label: string; start: bigint; deadline: bigint; h: bigint }) {
   const span = deadline - start;
   const used = h - start;
   const pct = span > 0n ? Math.max(0, Math.min(100, Number((used * 1000n) / span) / 10)) : 100;
   const passed = h > deadline;
   return (
-    <div className={`deadline ${passed ? "passed" : pct > 80 ? "soon" : ""}`}>
-      <div className="deadline-head">
-        <span className="deadline-label">{label}</span>
+    <div className={`fact-wide deadline ${passed ? "passed" : pct > 80 ? "soon" : ""}`}>
+      <dt>{label}</dt>
+      <dd>
         <span className="deadline-when">
           block {thousands(deadline)} · {timeLeft(deadline, h)}
         </span>
-      </div>
-      <div
-        className="deadline-track"
-        role="progressbar"
-        aria-label={`${label}: ${passed ? "passed" : approx(deadline - h + 1n) + " left"}`}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(pct)}
-      >
-        <span className="deadline-fill" style={{ ["--p" as string]: `${pct}%` }} />
-      </div>
+        <span
+          className="deadline-track"
+          role="progressbar"
+          aria-label={`${label}: ${passed ? "passed" : approx(deadline - h + 1n) + " left"}`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(pct)}
+        >
+          <span className="deadline-fill" style={{ ["--p" as string]: `${pct}%` }} />
+        </span>
+      </dd>
     </div>
   );
 }
@@ -151,7 +165,7 @@ export function DeadlineBar({ label, start, deadline, h }: { label: string; star
 
 export function SkeletonBoard() {
   return (
-    <div aria-busy="true" aria-live="polite" role="status" className="skeleton-wrap">
+    <div role="status" className="skeleton-wrap">
       <span className="sr-only">Reading the board…</span>
       <div className="stats">
         {[0, 1, 2, 3].map((i) => (
@@ -182,7 +196,7 @@ export function SkeletonRows({ n = 6 }: { n?: number }) {
 
 export function SkeletonQuest() {
   return (
-    <div aria-busy="true" role="status" className="skeleton-wrap">
+    <div role="status" className="skeleton-wrap">
       <span className="sr-only">Reading the quest…</span>
       <span className="sk sk-line short" />
       <span className="sk sk-h1" />
