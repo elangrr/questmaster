@@ -16,6 +16,12 @@
 // There is no admin, owner, pause, upgrade or sweep function. Nobody can move
 // escrowed coins except through the quest moves below.
 //
+// Coins sent straight to the realm address with a bank send (not through
+// PostQuest) are not tracked by any quest and cannot be moved by anyone, so
+// they are lost. On chain the guarantee is therefore: realm balance >= the
+// locked total, with equality when nobody sends coins outside PostQuest. The
+// pages and GetTotals use only the tracked numbers, never the balance.
+//
 // Nothing here hands out a pointer to stored state: read functions return
 // plain values (QuestView, Totals, []uint64, strings).
 package questmaster
@@ -312,11 +318,6 @@ func CountByPoster(addr address) int { return indexSize(&byPoster, addr) }
 
 // CountByBuilder returns how many quests addr has ever claimed.
 func CountByBuilder(addr address) int { return indexSize(&byBuilder, addr) }
-
-// Render is a placeholder; the board pages come in a later version.
-func Render(path string) string {
-	return "# QuestMaster\n\nA GNOT bounty board. Pages coming soon.\n"
-}
 
 // ---------------------------------------------------------------------------
 // Internal helpers

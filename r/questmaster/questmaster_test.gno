@@ -68,11 +68,16 @@ func resetState() {
 
 // post posts a quest from u with reward ugnot, simulating the MsgCall deposit.
 func post(cur realm, u address, reward int64, title string) uint64 {
+	return postD(cur, u, reward, title, "details")
+}
+
+// postD is post with chosen details.
+func postD(cur realm, u address, reward int64, title, details string) uint64 {
 	testing.SetRealm(testing.NewUserRealm(u))
 	testing.SetOriginSend(nil)
 	testing.SetOriginSend(ugnot(reward))
 	testing.IssueCoins(realmAddr, ugnot(reward))
-	id := PostQuest(cross(cur), title, "details", 2_000)
+	id := PostQuest(cross(cur), title, details, 2_000)
 	testing.SetOriginSend(nil)
 	return id
 }
