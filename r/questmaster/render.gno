@@ -307,7 +307,7 @@ func renderHelp() string {
 	b.WriteString("Send the reward with the call: exactly one coin, in `ugnot`, at least " + gnotStr(MinReward) + " GNOT (1 GNOT = 1000000 ugnot). " +
 		"Arguments: title (up to " + strconv.Itoa(escrow.MaxTitleLen) + " characters, one line), details (up to " + strconv.Itoa(escrow.MaxDetailsLen) +
 		" characters), work window in blocks (" + blocksStr(escrow.MinWorkBlocks) + " to " + blocksStr(escrow.MaxWorkBlocks) + "). " +
-		"Posting also stores the quest on chain. The chain charges a storage deposit for that, paid by the poster on top of the reward: "+
+		"Posting also stores the quest on chain. The chain charges a storage deposit for that, paid by the poster on top of the reward: " +
 		"about 0.65 GNOT for a new quest at the default price of 100 ugnot per byte (measured on a local node). It is held by the chain, not by this realm, and is not part of the escrow; when a later call makes the stored data smaller, the chain returns that share to whoever made the call.\n\n")
 	b.WriteString("With gnoweb, pick a reward: " + postLinks() + ". The form shows the amount and asks you to confirm adding the coins. " +
 		"For another amount, change `.send=` in the link's address or use gnokey.\n\n")
