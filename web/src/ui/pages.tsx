@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { config, gnowebPage, rules } from "../config";
-import { argsFor, actionsFor, roleOf, type ActionOption } from "../lib/actions";
+import { argsFor, actionsFor, NOT_CONNECTED, roleOf, type ActionOption } from "../lib/actions";
 import { QuestState, type Quest } from "../lib/amino";
 import { approx, gnot, thousands, timeLeft, windowToBlocks, type WindowUnit } from "../lib/format";
 import { read } from "../lib/rpc";
@@ -323,8 +323,10 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
 function ActionItem({ q, o, onDone }: { q: Quest; o: ActionOption; onDone: (hash: string) => void }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const w = useWallet();
   const problem = o.input === "link" ? checkLink(input) : o.input === "reason" ? checkReason(input) : null;
-  const disabled = o.blocked !== null && o.blocked !== "Connect a wallet to do this.";
+  const notConnected = o.blocked === NOT_CONNECTED;
+  const disabled = o.blocked !== null && !notConnected;
   return (
     <li className={`action ${disabled ? "blocked" : ""}`}>
       <div className="action-row">
@@ -333,9 +335,26 @@ function ActionItem({ q, o, onDone }: { q: Quest; o: ActionOption; onDone: (hash
           <p className="action-explain">{o.explain}</p>
           {o.blocked && <p className="muted small">{o.blocked}</p>}
         </div>
-        <button className="btn" aria-expanded={open} onClick={() => setOpen(!open)} disabled={disabled}>
-          {open ? "Hide" : "Do this"}
-        </button>
+        {notConnected ? (
+          <div className="action-buttons">
+            {w.installed ? (
+              <button className="btn btn-primary" onClick={() => void w.connect()} disabled={w.busy}>
+                Connect wallet
+              </button>
+            ) : (
+              <a className="btn btn-primary" href="https://adena.app" target="_blank" rel="noopener noreferrer">
+                Get Adena
+              </a>
+            )}
+            <button className="btn btn-ghost-text" aria-expanded={open} onClick={() => setOpen(!open)}>
+              {open ? "Hide" : "Other ways"}
+            </button>
+          </div>
+        ) : (
+          <button className="btn" aria-expanded={open} onClick={() => setOpen(!open)} disabled={disabled}>
+            {open ? "Hide" : "Do this"}
+          </button>
+        )}
       </div>
       {open && (
         <div className="action-body">
@@ -350,6 +369,7 @@ function ActionItem({ q, o, onDone }: { q: Quest; o: ActionOption; onDone: (hash
             </Field>
           )}
           <TxPanel
+            fallbackOpen={notConnected}
             spec={{ func: o.func, args: argsFor(o.func, q.id, input), questId: q.id, label: o.label, problem: o.input ? problem : null }}
             onDone={(hash) => {
               setOpen(false);

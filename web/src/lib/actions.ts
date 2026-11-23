@@ -73,6 +73,9 @@ export function gnowebActionLink(func: ActionName, id?: bigint, sendUgnot?: bigi
 
 export type Role = "poster" | "builder" | "other" | "none"; // none = no wallet
 
+/** The reason shown when no wallet is connected. */
+export const NOT_CONNECTED = "Connect a wallet to do this.";
+
 export function roleOf(q: Quest, address: string | null): Role {
   if (!address) return "none";
   if (address === q.poster) return "poster";
@@ -101,7 +104,7 @@ export interface ActionOption {
 export function actionsFor(q: Quest, h: bigint, address: string | null): ActionOption[] {
   const role = roleOf(q, address);
   const need = (who: "poster" | "builder" | "anyone" | "notPoster"): string | null => {
-    if (role === "none") return "Connect a wallet to do this.";
+    if (role === "none") return NOT_CONNECTED;
     if (who === "anyone") return null;
     if (who === "notPoster") return role === "poster" ? "You posted this quest; someone else must take it." : null;
     if (who === "poster") return role === "poster" ? null : "Only the poster can do this.";

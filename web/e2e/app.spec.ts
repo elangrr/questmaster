@@ -90,9 +90,11 @@ test("without a wallet, actions explain and offer gnokey and gnoweb", async ({ p
   await open(page, "/quest/31");
   const claim = page.locator(".action", { hasText: "Take this quest" });
   await expect(claim).toContainText("Connect a wallet to do this.");
-  await claim.getByRole("button", { name: "Do this" }).click();
+  // No "Do this" without a wallet: the main button gets Adena; the fallback is one click away, already open.
+  await expect(claim.getByRole("button", { name: "Do this" })).toHaveCount(0);
+  await expect(claim.getByRole("link", { name: "Get Adena" })).toHaveAttribute("href", "https://adena.app");
+  await claim.getByRole("button", { name: "Other ways" }).click();
   await expect(claim).toContainText("install the Adena wallet");
-  await claim.locator("summary").click();
   await expect(claim.locator("pre.cmd")).toContainText(`-pkgpath '${REALM}'`);
   await expect(claim.locator("pre.cmd")).toContainText("-func 'ClaimQuest'");
   await expect(claim.locator("pre.cmd")).toContainText("-args '31'");
@@ -163,11 +165,13 @@ test("with a mocked Adena: connect, wrong network, claim sends the exact message
     };
   }, [BUILDER]);
   await open(page, "/quest/31");
-  await page.getByRole("button", { name: "Connect wallet" }).click();
+  // Not connected yet: each action offers "Connect wallet" instead of "Do this".
+  const claim = page.locator(".action", { hasText: "Take this quest" });
+  await expect(claim.getByRole("button", { name: "Do this" })).toHaveCount(0);
+  await claim.getByRole("button", { name: "Connect wallet" }).click();
   await expect(page.getByRole("button", { name: "Switch to dev" })).toBeVisible();
   await page.getByRole("button", { name: "Switch to dev" }).click();
   await expect(page.locator(".wallet-addr")).toHaveText("g1us8428…njlj");
-  const claim = page.locator(".action", { hasText: "Take this quest" });
   await claim.getByRole("button", { name: "Do this" }).click();
   await claim.getByRole("button", { name: "Take this quest" }).click();
   await expect(page.locator(".ok")).toContainText("Sent: Take this quest. Transaction");

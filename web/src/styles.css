@@ -239,3 +239,6 @@ table.quests { width: 100%; border-collapse: collapse; }
 .foot { border-top: 1px solid var(--line); padding: 18px 16px 28px; text-align: center; font-size: 0.9rem; }
 .foot p { margin: 4px auto; max-width: 900px; }
 .nowrap { white-space: nowrap; }
+.action-buttons { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.btn-ghost-text { border-color: transparent; background: transparent; color: var(--accent); font-weight: 600; }
+@media (max-width: 600px) { .action-row { flex-direction: column; } .action-buttons { flex-direction: row; } }

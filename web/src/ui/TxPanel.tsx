@@ -52,7 +52,7 @@ export interface TxSpec {
  * Signs one call with Adena and reports the result. Always offers the gnokey
  * command and the gnoweb form for the same call.
  */
-export function TxPanel({ spec, onDone, note }: { spec: TxSpec; onDone?: (hash: string) => void; note?: ReactNode }) {
+export function TxPanel({ spec, onDone, note, fallbackOpen = false }: { spec: TxSpec; onDone?: (hash: string) => void; note?: ReactNode; fallbackOpen?: boolean }) {
   const w = useWallet();
   const [busy, setBusy] = useState(false);
   const [hash, setHash] = useState<string | null>(null);
@@ -93,7 +93,7 @@ export function TxPanel({ spec, onDone, note }: { spec: TxSpec; onDone?: (hash: 
         </p>
       )}
       {hash && !onDone && <TxSent hash={hash} />}
-      <details className="fallback">
+      <details className="fallback" open={fallbackOpen}>
         <summary>No Adena? Use gnokey or gnoweb</summary>
         <p className="muted">With gnokey (replace YOUR_KEY_NAME):</p>
         <pre className="cmd">{cmd}</pre>
