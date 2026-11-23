@@ -75,7 +75,7 @@ func renderHome(page int) string {
 		"If the poster never answers, the builder can collect the reward after the review window. Nobody else, not even the authors, can move the locked GNOT.\n\n")
 
 	b.WriteString("_Runs on the Onyx test network with test GNOT._\n\n")
-	b.WriteString("[Post a quest](" + postLink() + ") · [How it works](#how-it-works) · [Help and commands](" + pageURL("help") + ") · [Paid quests](" + pageURL("paid") + ")\n\n")
+	b.WriteString("**Post a quest:** " + postLinks() + " · [How it works](#how-it-works) · [Help and commands](" + pageURL("help") + ") · [Paid quests](" + pageURL("paid") + ")\n\n")
 
 	b.WriteString("## Board\n\n")
 	b.WriteString("| Open quests | GNOT locked | GNOT paid out | Quests paid |\n")
@@ -307,8 +307,10 @@ func renderHelp() string {
 	b.WriteString("Send the reward with the call: exactly one coin, in `ugnot`, at least " + gnotStr(MinReward) + " GNOT (1 GNOT = 1000000 ugnot). " +
 		"Arguments: title (up to " + strconv.Itoa(escrow.MaxTitleLen) + " characters, one line), details (up to " + strconv.Itoa(escrow.MaxDetailsLen) +
 		" characters), work window in blocks (" + blocksStr(escrow.MinWorkBlocks) + " to " + blocksStr(escrow.MaxWorkBlocks) + "). " +
-		"Posting also stores the quest on chain, which locks a small storage deposit paid by the poster on top of the reward.\n\n")
-	b.WriteString("[Post with gnoweb](" + postLink() + ") (the form starts with 1 GNOT; change the send amount to your reward).\n\n")
+		"Posting also stores the quest on chain. The chain charges a storage deposit for that, paid by the poster on top of the reward: "+
+		"about 0.65 GNOT for a new quest at the default price of 100 ugnot per byte (measured on a local node). It is held by the chain, not by this realm, and is not part of the escrow; when a later call makes the stored data smaller, the chain returns that share to whoever made the call.\n\n")
+	b.WriteString("With gnoweb, pick a reward: " + postLinks() + ". The form shows the amount and asks you to confirm adding the coins. " +
+		"For another amount, change `.send=` in the link's address or use gnokey.\n\n")
 	b.WriteString("```\n" + gnokeyCall("PostQuest", "", "", "5000000ugnot") + "\n```\n\n")
 
 	sections := []struct{ title, text, fn, arg string }{
@@ -406,8 +408,19 @@ func pageURL(p string) string {
 	return realmPath() + ":" + p
 }
 
-func postLink() string {
-	return txLink("PostQuest").SetSend(strconv.FormatInt(MinReward, 10) + "ugnot").URL()
+func postLink() string { return postLinkFor(MinReward) }
+
+func postLinkFor(ugnot int64) string {
+	return txLink("PostQuest").SetSend(strconv.FormatInt(ugnot, 10) + "ugnot").URL()
+}
+
+// postLinks offers PostQuest forms with a few prefilled rewards.
+func postLinks() string {
+	var links []string
+	for _, n := range []int64{1, 5, 10} {
+		links = append(links, "["+strconv.FormatInt(n, 10)+" GNOT]("+postLinkFor(n*1_000_000)+")")
+	}
+	return strings.Join(links, " · ")
 }
 
 // gnokeyCall builds a copy-paste gnokey command. Only realm-chosen text goes
@@ -426,7 +439,7 @@ func gnokeyCall(fn, id, arg, send string) string {
 	if send != "" {
 		cmd += " -send \"" + send + "\""
 	}
-	return cmd + " -gas-fee 1000000ugnot -gas-wanted 20000000 -broadcast -chainid " + chainID + " -remote " + chainRPC + " KEY"
+	return cmd + " -gas-fee 1000000ugnot -gas-wanted 50000000 -broadcast -chainid " + chainID + " -remote " + chainRPC + " KEY"
 }
 
 // QuestMaster runs on the Onyx test network only; every example command

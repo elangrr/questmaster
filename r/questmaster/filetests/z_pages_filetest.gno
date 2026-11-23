@@ -65,7 +65,7 @@ func main(cur realm) {
 //
 // _Runs on the Onyx test network with test GNOT._
 //
-// [Post a quest](/r/questmaster_dev/questmaster$help&func=PostQuest&.send=1000000ugnot) · [How it works](#how-it-works) · [Help and commands](/r/questmaster_dev/questmaster:help) · [Paid quests](/r/questmaster_dev/questmaster:paid)
+// **Post a quest:** [1 GNOT](/r/questmaster_dev/questmaster$help&func=PostQuest&.send=1000000ugnot) · [5 GNOT](/r/questmaster_dev/questmaster$help&func=PostQuest&.send=5000000ugnot) · [10 GNOT](/r/questmaster_dev/questmaster$help&func=PostQuest&.send=10000000ugnot) · [How it works](#how-it-works) · [Help and commands](/r/questmaster_dev/questmaster:help) · [Paid quests](/r/questmaster_dev/questmaster:paid)
 //
 // ## Board
 //
@@ -127,8 +127,8 @@ func main(cur realm) {
 // With gnokey on Onyx (replace `KEY` with your key name):
 //
 // ```
-// gnokey maketx call -pkgpath "gno.land/r/questmaster_dev/questmaster" -func "ApproveWork" -args "4" -gas-fee 1000000ugnot -gas-wanted 20000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
-// gnokey maketx call -pkgpath "gno.land/r/questmaster_dev/questmaster" -func "RejectWork" -args "4" -args "What is missing" -gas-fee 1000000ugnot -gas-wanted 20000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
+// gnokey maketx call -pkgpath "gno.land/r/questmaster_dev/questmaster" -func "ApproveWork" -args "4" -gas-fee 1000000ugnot -gas-wanted 50000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
+// gnokey maketx call -pkgpath "gno.land/r/questmaster_dev/questmaster" -func "RejectWork" -args "4" -args "What is missing" -gas-fee 1000000ugnot -gas-wanted 50000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 KEY
 // ```
 //
 // _Times are approximate, at about 3.5 seconds per block; deadlines are exact block heights._
