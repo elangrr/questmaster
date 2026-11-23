@@ -67,8 +67,22 @@ gnokey query -home "$HOME/.gno-questmaster" vm/qpkgmeta_json \
 - Not submitted (yet): `{"path":"…","status":"absent"}`
 - Any other reason (for example a failed type check) means it will not be enabled: see "If a bug is found" below.
 
-On 2026-11-23 Onyx had 68 parked packages, some for a long time. Check every few minutes; if it stays parked for
-hours, ask in the Gno.land Discord. All parked packages:
+**Official status page.** The approver (gpao, an automated oracle) publishes its verdict per package:
+https://gpas.onyx.testnets.gno.land/?path=gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow (and the same
+with `gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster` for the realm). The gno docs give
+`https://gpas.latest.testnets.gno.land`, which redirects there. Its statuses (from `contribs/gpao/README.md`):
+
+| Status | Meaning | What to do |
+|---|---|---|
+| `pending` (shown as "in review queue") | not decided yet; it will be retried | wait |
+| `approved` | enabled | nothing |
+| `rejected`, with a reason | the code did not pass (for example a failed type check) | fix it and deploy to a new `/v2` path (below) |
+| `gave_up` | retried up to the limit; needs a human | ask in the Gno.land Discord |
+| `blocked` | nothing wrong with the package: the oracle ran out of fees | ask the operator in the Discord |
+| `unknown` | never seen | check the path; if still unknown after a minute, ask in the Discord |
+
+The gno docs say a package is enabled "a few seconds after `addpkg`"; on 2026-11-23 the realm stayed "in review
+queue" for hours while the escrow was enabled, so plan for waiting. All parked packages:
 `gnokey query -home "$HOME/.gno-questmaster" vm/qinertpaths -remote https://rpc.onyx.testnets.gno.land:443`
 
 **Do not submit the realm before the escrow is live**: the approver resolves the realm's imports from the chain, so
@@ -154,8 +168,9 @@ A deployed package cannot be changed or replaced at the same path, and a parked 
 (an approval names the exact source). Never try to reuse a path. Instead:
 
 1. Fix the code; run all tests and `scripts/local-flow.sh` again.
-2. Move to new paths, for example `gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow/v2` and
-   `gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster2`: change the two `gnomod.toml` module lines,
+2. Move to new paths ending in `/v2` on both packages (the gno docs' convention for a new version):
+   `gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow/v2` and
+   `gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster/v2`. Change the two `gnomod.toml` module lines,
    the escrow import in `r/questmaster` (code, tests) and in `p/escrow/z_example_filetest.gno`, and the realm path in
    the tests, filetests, `scripts/local-flow.sh` and the README. `grep -rn "g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/" .`
    finds them all. Regenerate goldens (`gno test -update-golden-tests ./r/questmaster/`) and run the tests.

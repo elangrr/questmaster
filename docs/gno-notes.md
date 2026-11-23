@@ -24,8 +24,8 @@ gno repo at that tag.
 | `chain` (coins, `chain.Emit`) | confirmed | `gnovm/stdlibs/chain/emit_event.gno`: `func Emit(typ string, attrs ...string)` |
 | `chain/runtime`, `runtime.ChainHeight()` | confirmed | `gnovm/stdlibs/chain/runtime/native.gno`: `func ChainHeight() int64` |
 | `unsafe.OriginSend()` / `unsafe.PreviousRealm()` | **corrected (import path)** | They live in package `unsafe` at import path **`chain/runtime/unsafe`** (not a top-level `unsafe`). `OriginSend() chain.Coins`, `PreviousRealm() runtime.Realm`. |
-| Caller comes from `unsafe.PreviousRealm()` | **corrected (preferred form)** | The package doc of `chain/runtime/unsafe` and docs/resources/gno-interrealm-v2.md §5.4 say to use **`cur.Previous()`** on the `cur realm` parameter for caller identity; `unsafe.PreviousRealm()` stack-walks and is flagged as footgun-prone. Use `cur.Previous().Address()` in the realm. |
-| Payment check with `OriginSend()` | **added requirement** | `unsafe.OriginSend` doc: when used for payment verification, pair it with `runtime.AssertOriginCall()` and `cur.Previous().IsUserCall()` (not `IsUser()`), because a middle realm could consume the send envelope. |
+| Caller comes from `unsafe.PreviousRealm()` | **corrected (preferred form)** | The package doc of `chain/runtime/unsafe` and docs/resources/gno-security-guide.md §5.8 ("`unsafe.PreviousRealm()` alongside a `cur realm` parameter … is always wrong") say to use **`cur.Previous()`** on the `cur realm` parameter for caller identity; `unsafe.PreviousRealm()` stack-walks and bypasses the `cur` capability. Use `cur.Previous().Address()` in the realm. |
+| Payment check with `OriginSend()` | **added requirement** | Pair it with `cur.Previous().IsUserCall()` (not `IsUser()`), because a middle realm or a `maketx run` script could consume the send envelope (docs/resources/effective-gno.md, "use `IsUserCall()` instead of `IsUser()`"). The `unsafe` package doc also mentions `runtime.AssertOriginCall()`; QuestMaster does not use it (see "Realm caller and payment guard" below). |
 | `cur realm` crossing form | confirmed | gno-interrealm-v2.md §5: `func F(cur realm, ...)`, `cur` must be the first parameter, only in `/r/` packages, never in `/p/`. Call from another realm as `F(cross(cur), ...)`. |
 | `gnomod.toml` format | confirmed | `module = "<path>"` and `gno = "0.9"`. An `[addpkg]` section is filled by the chain at deploy time; a module with `[[replace]]` cannot be deployed. |
 | `testing` helpers `SetRealm`, `NewUserRealm`, `SetOriginSend`, `IssueCoins`, `SkipHeights` | confirmed | `gnovm/tests/stdlibs/testing/context_testing.gno`. Also there: `SetOriginCaller`, `SetHeight`, `NewCodeRealm`. `NewUserRealm(addr) runtime.Realm`. |
@@ -104,7 +104,7 @@ approximate time.
 
 `gnodev local -txs-file <file>` replays genesis transactions with no signature, and their signers are
 premined, so a `PostQuest` call can be checked without creating or importing any key. gnodev keeps its
-built-in test1 key in `<-home>/data/keys.db`; `-home` defaults to `GNOHOME`, so keep that pointed at a
+built-in `devtest` key (address `g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5`, docs/resources/gnodev.md) in `<-home>/data/keys.db`; `-home` defaults to `GNOHOME`, so keep that pointed at a
 throwaway folder.
 
 ## gnoweb and Render (v1.8.0)
@@ -140,7 +140,7 @@ throwaway folder.
 - Measured per call on the local flow: posting a quest about 0.65 GNOT (647,600 ugnot), approve 102,800,
   claim about 0.29 GNOT; cancelling returned 97,800 to the poster. The cap per call is `-max-deposit`
   (default 100 GNOT on the chain).
-- Gas: one PostQuest used about 2.1M VM gas in a filetest; the example commands use `-gas-wanted 50000000`.
+- Gas: one PostQuest used about 2.1M VM gas in a filetest. (The commands now use `-gas-wanted 10000000`; see the Onyx facts below.)
 
 ## Local flow on gnodev without keys
 
@@ -187,7 +187,8 @@ Other facts:
 - Faucet: `https://faucet.gno.land`, entry "Onyx Faucet" (`chain_id: "onyx-1"`, served by
   `https://faucet.onyx.testnets.gno.land`), with request amounts 100, 200 or 300 test GNOT and a captcha (from the faucet
   site's configuration in its JavaScript). Per-address limits are not stated.
-- Gas actually used (filetests, VM gas including storage writes): PostQuest about 2.1M to 2.7M; a whole quest
+- Gas measured in filetests (VM gas including storage writes; an estimate, not the chain's full transaction gas, which
+  also charges for transaction size and signatures; `-simulate only` gives the real number): PostQuest about 2.1M to 2.7M; a whole quest
   lifecycle of 17 calls 10.4M. Recommended for every QuestMaster call: `-gas-wanted 10000000 -gas-fee 100000ugnot`
   (the minimum fee for 10M gas is 10,000 ugnot at today's price; 100,000 ugnot is 0.1 test GNOT and leaves room if
   the price rises). gnokey simulates a transaction before broadcasting (default `-simulate test`), so too little gas
@@ -209,6 +210,12 @@ Other facts:
   Gno standard library stay under the GNO Network General Public License v6 and its attribution terms; NOTICE and
   the README say so, and the pages keep "Built on gno.land". Before this, from task 4 until this change, the repo's
   LICENSE was the GNO Network GPL v6.
+- **On-chain copy (our reading, not legal advice):** the Network Interaction Terms (`TERMS.md` in gnolang/gno, section
+  5) say "Any code or other copyrightable work you publish for execution on the Network is made available under the
+  GNO Network General Public License, version 6 … including its Additional Terms on Strong Attribution". So the copy of
+  QuestMaster published on Onyx is also under that licence, alongside Apache 2.0 for the repository. README and
+  NOTICE say both. Section 5 also requires accepting the CLA when publishing packages; CLA enforcement is disabled on
+  Onyx today (see the Onyx facts).
 
 ## Hardening after the security review (task 5)
 
@@ -300,3 +307,29 @@ Cheapest reductions (not done; estimates from the table):
   ones all tests ran against; sanitize differs from the v1.8.0 examples only in comments.
 - **Dry run**: `gnokey maketx addpkg ... -simulate only` signs and simulates without broadcasting and prints the gas
   used (needs the key, so the owner runs it).
+
+## Why this follows the Gno docs
+
+Each safety property, with the doc rule it follows (docs at v1.8.0, `~/src/gno/docs`):
+
+| Property | How QuestMaster does it | Doc rule |
+|---|---|---|
+| The caller is who they say | actor from `cur.Previous().Address()` only | gno-security-guide.md §5.8; gno-ai-contract-review.md item 1 |
+| Coins really arrived | `unsafe.OriginSend()` checked only together with `cur.Previous().IsUserCall()` | effective-gno.md ("use `IsUserCall()` instead of `IsUser()`"); gno-security-guide.md (payment-guarded entry points) |
+| Coins never get stuck | every call that takes no coins refuses them | effective-gno.md (OriginSend amount check paired with the guard) |
+| The realm pays only from itself | banker built with the live `cur` (`NewBanker(BankerTypeRealmSend, cur)`), sends exactly the payout | gno-stdlibs.md (`NewBanker`); banker.gno ("rlm must be the live cur") |
+| Rules cannot change | rules in a pure `/p/` package; state and coins in the `/r/` realm | gno-packages.md; gno-interrealm-v2.md §5 (crossing functions only in `/r/`) |
+| Errors and reverts | `/p/` returns errors, `/r/` panics so the transaction reverts | effective-gno.md ("Embrace panic"; reusable packages return errors) |
+| No pointer leaks | no exported variables; read functions return copies (`QuestView`, `Totals`, `[]uint64`) | gno-security-guide.md ("returning a pointer … is equivalent to publishing those mutators"); gno-ai-contract-review.md item 3 |
+| Sorted ids | avl keys zero-padded to 20 digits | community-packages.md (`avl.Tree` with `seqid` instead of stringified integers) |
+| Observable | an event on every state change | gno-stdlibs.md (`chain.Emit`) |
+| Safe pages | `Render` never panics; all user text escaped with `p/nt/markdown/sanitize/v0` plus the gnoweb-specific steps | explore-with-gnoweb.md (sanitize helpers); gnoweb's SANITIZE.md |
+
+Two checklist items that do not apply, so reviewers need not file them:
+
+- `cur.IsCurrent()`: the checklists (gno-ai-contract-review.md, gno-security-guide.md) suggest calling it, but the
+  authoritative spec says "`cur.IsCurrent()` is always true and a check on it refuses nobody" (gno-interrealm-v2.md);
+  it guards a realm value handed to you as an argument, and QuestMaster takes none.
+- "Flag any import of `chain/runtime/unsafe`" (gno-ai-contract-review.md): the realm imports it only for
+  `OriginSend()` in the documented `IsUserCall` pairing and for `CurrentRealm().PkgPath()` once in `init()` (to build
+  page links). A later version can use `func init(cur realm)` with `cur.PkgPath()` instead (effective-gno.md).

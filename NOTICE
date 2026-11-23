@@ -4,6 +4,12 @@ Copyright 2026 Fluxen
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 That licence covers only the code written for QuestMaster in this repository.
 
+The copy of QuestMaster published on the Gno.land network is, in addition,
+made available under the GNO Network General Public License, version 6,
+including its Additional Terms on Strong Attribution, as the network's
+Network Interaction Terms (section 5, TERMS.md in github.com/gnolang/gno)
+provide for all code published for execution on the network.
+
 Third-party software
 --------------------
 

@@ -15,7 +15,7 @@ Contents: [Web app](#web-app) · [Tour](#a-one-minute-tour) · [How to use it](#
 
 ## Web app
 
-A friendlier front door than gnoweb: browse the board, read quests, and post, take, submit and review with the Adena wallet, all in the browser. It is a static site that reads the realm straight from the Onyx node; every action also shows the equivalent `gnokey` command and gnoweb form.
+A friendlier front door than gnoweb: browse the board, read quests, and post, take, submit and review with the Adena wallet, all in the browser. It is a static site that reads the realm straight from the Onyx node; every action also shows the equivalent `gnokey` command and gnoweb form. When you sign with Adena, the wallet chooses the network fee and shows it before you sign.
 
 - Web app: `TODO-DEPLOY: web app URL`
 - Code, tests and hosting notes: [`web/`](web/README.md); a hands-on checklist with Adena: [`web/TESTING.md`](web/TESTING.md).
@@ -83,6 +83,7 @@ First get test GNOT: open https://faucet.gno.land, choose the **Onyx Faucet**, p
 1. Install a Gno.land wallet such as [Adena](https://www.adena.app) and switch it to the Onyx network.
 2. Open the board: https://onyx.testnets.gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster
 3. **Post**: click one of the reward links (1, 5 or 10 GNOT). gnoweb opens a form for `PostQuest` with the reward filled in. It shows "This transaction link is requesting … from your balance"; turn on the switch to add the coins, fill in the title, details and work window in blocks, and sign with your wallet. For another amount, change `.send=` in the link, or use gnokey.
+   Adena chooses the network fee and shows it before you sign.
 4. **Everything else**: open a quest page. Under "What can happen next" each possible move has an "Open in gnoweb" link that opens the form with the quest number filled in. Sign it with your wallet. These calls take no coins.
 
 ### With gnokey
@@ -148,7 +149,7 @@ Limits: reward at least 1 GNOT, in `ugnot` only, as one coin; title up to 80 cha
 On Onyx, with test GNOT:
 
 - **The reward**: locked when you post, paid to the builder or refunded to you. Exactly the amount you sent.
-- **Gas fees**: every transaction pays its fee whether or not it succeeds. The minimum gas price on Onyx is 1 ugnot per 1,000 gas (`auth/gasprice`). A QuestMaster call needs about 3 million gas or less; the commands above ask for 10 million and pay 0.1 GNOT, which leaves room if the gas price rises.
+- **Network fees**: with Adena, the wallet chooses the fee and shows it before you sign. With gnokey you set it: the minimum gas price on Onyx is 1 ugnot per 1,000 gas (`auth/gasprice`), a QuestMaster call needs about 3 million gas or less, and the commands above ask for 10 million and pay 0.1 GNOT, which leaves room if the price rises. To size a call exactly, run the same command with `-simulate only`: it simulates without sending and prints the gas used. gnokey simulates every transaction before sending it, so one that would fail is not sent and costs nothing; a transaction that is sent and then fails on chain still pays its fee.
 - **Storage deposit**: the chain charges 100 ugnot per byte of new data a transaction stores (`params/vm:p:storage_price`), paid by whoever sends it. Measured on a local node: posting a quest about 0.65 to 0.76 GNOT (a poster's first quest also creates their index), a builder's first claim about 0.19 to 0.29 GNOT, approving about 0.10 GNOT. Closing a quest stores nothing new. The deposit is held by the chain at an address of its own, not by the realm, so it never mixes with escrowed rewards. When a later call makes the stored data smaller (for example cancelling a quest freed about 0.10 GNOT), the chain returns that share to the sender of that call. On Onyx `ugnot` is not a restricted coin, so the refund goes to that sender.
 
 ## Safety
@@ -179,13 +180,34 @@ The escrow holds other people's money, so the rules are strict and each one is t
 - Storage deposits paid for a quest are not refunded, because quests are never deleted. When a later call makes the stored data smaller, the chain returns that share to the sender of that call, not necessarily to whoever paid it.
 - Payouts are bank transfers from the realm. On a network that lists `ugnot` in `params/bank:p:restricted_denoms`, a realm like this could not pay out, and freed deposits would go to the storage fee collector. On 2026-11-23 that parameter was `[]` on Onyx (and on mainnet).
 - Calls from other realms or DAOs are refused. Only wallets can use the board.
-- New packages on Onyx are parked until the network's package approver enables them (see `docs/deploy.md`).
+- New packages on Onyx are parked until the network's package approver enables them. The official status page, https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster, shows where QuestMaster is (see `docs/deploy.md`).
 
 ## Using `p/escrow` in your own realm
 
-`p/escrow` is a pure package: it holds the quest type and every rule, but no coins and no storage. Your realm keeps the quests and moves the coins; the escrow tells it whether a move is allowed and whom to pay. This minimal realm is tested: it is the top of `p/escrow/z_example_filetest.gno`.
+`p/escrow` is a pure package: it holds the quest type and every rule, but no coins and no storage. Your realm keeps the quests and moves the coins; the escrow tells it whether a move is allowed and whom to pay.
+
+Four rules for any realm that uses it (QuestMaster's realm follows all four):
+
+1. **Take the actor only from `cur.Previous()`**, never from a function argument. The escrow trusts the actor it is given.
+2. **Accept only direct calls from a wallet (`cur.Previous().IsUserCall()`) wherever coins are checked**, so the coins `unsafe.OriginSend()` reports really landed in your realm, and refuse coins on calls that take none, so nothing gets stuck. (The Gno docs, `effective-gno.md`, give this pairing as the payment guard; `IsUser()` is not enough.)
+3. **Never return a stored `*escrow.Quest`** from your realm. Its methods change state, so handing out the pointer would publish them as your API. Return plain values.
+4. **Key your tree with zero-padded ids** (or `seqid`), so quest 10 sorts after quest 9.
+
+This minimal realm follows them. It lives in [`docs/examples/bounty/`](docs/examples/bounty/) and is compiled and tested by `gno test ./...` (flow, refusals and key order):
 
 ```go
+// Package bounty is the example from the QuestMaster README: a minimal realm
+// that uses p/escrow for its rules. It is compiled and tested with
+// `gno test ./...` from the repository root. It is an example, not deployed.
+//
+// The four rules every realm using p/escrow should follow, all shown here:
+//  1. Take the actor only from cur.Previous(), never from an argument.
+//  2. Accept only direct user calls (cur.Previous().IsUserCall()) where coins
+//     are checked, so unsafe.OriginSend() really landed in this realm; refuse
+//     coins on calls that do not take any.
+//  3. Never return a stored *escrow.Quest: its methods change state and trust
+//     the actor they are given. Return plain values.
+//  4. Key the tree with zero-padded ids, so "10" sorts after "9".
 package bounty
 
 import (
@@ -194,60 +216,101 @@ import (
 	"chain/runtime"
 	"chain/runtime/unsafe"
 	"strconv"
+	"strings"
 
-	"gno.land/p/nt/avl/v0"
 	"gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow"
+	"gno.land/p/nt/avl/v0"
 )
 
 var (
-	quests avl.Tree // id -> *escrow.Quest
+	quests avl.Tree // key(id) -> *escrow.Quest
 	lastID uint64
 )
 
 // Post locks the ugnot sent with the call as the reward.
 func Post(cur realm, title string, workBlocks int64) uint64 {
-	if !cur.Previous().IsUserCall() {
-		panic("direct user calls only")
-	}
+	poster := userCall(cur)
 	sent := unsafe.OriginSend()
 	if len(sent) != 1 || sent[0].Denom != "ugnot" {
 		panic("send the reward as one ugnot coin")
 	}
+	q, err := escrow.NewQuest(lastID+1, poster, title, "", sent[0].Amount, workBlocks, runtime.ChainHeight())
+	check(err)
 	lastID++
-	q, err := escrow.NewQuest(lastID, cur.Previous().Address(), title, "", sent[0].Amount, workBlocks, runtime.ChainHeight())
-	if err != nil {
-		panic(err.Error())
-	}
-	quests.Set(strconv.FormatUint(lastID, 10), q)
+	quests.Set(key(lastID), q)
 	return lastID
 }
 
 func Claim(cur realm, id uint64) {
-	check(get(id).Claim(cur.Previous().Address(), runtime.ChainHeight()))
+	actor := userCall(cur)
+	noCoins()
+	check(get(id).Claim(actor, runtime.ChainHeight()))
 }
 
 func Submit(cur realm, id uint64, link string) {
-	check(get(id).Submit(cur.Previous().Address(), link, runtime.ChainHeight()))
+	actor := userCall(cur)
+	noCoins()
+	check(get(id).Submit(actor, link, runtime.ChainHeight()))
 }
 
 // Approve applies the move first, then pays exactly what the escrow says.
 func Approve(cur realm, id uint64) {
-	p, err := get(id).Approve(cur.Previous().Address(), runtime.ChainHeight())
+	actor := userCall(cur)
+	noCoins()
+	p, err := get(id).Approve(actor, runtime.ChainHeight())
 	check(err)
 	pay(p, cur)
 }
 
+// Cancel refunds an open quest at once; on a claimed quest it only closes it
+// (p.Due() is false and nothing is paid yet).
+func Cancel(cur realm, id uint64) {
+	actor := userCall(cur)
+	noCoins()
+	p, err := get(id).Cancel(actor, runtime.ChainHeight())
+	check(err)
+	pay(p, cur)
+}
+
+// State returns a plain value, never the stored *escrow.Quest.
+func State(id uint64) string { return get(id).State().String() }
+
+// userCall refuses anything but a direct call from a wallet and returns the
+// caller. The actor always comes from cur.Previous().
+func userCall(cur realm) address {
+	if !cur.Previous().IsUserCall() {
+		panic("direct user calls only")
+	}
+	return cur.Previous().Address()
+}
+
+func noCoins() {
+	if len(unsafe.OriginSend()) != 0 {
+		panic("this call takes no coins")
+	}
+}
+
+// pay sends a payout only when one is due.
 func pay(p escrow.Payout, rlm realm) {
+	if !p.Due() {
+		return
+	}
 	b := banker.NewBanker(banker.BankerTypeRealmSend, rlm)
 	b.SendCoins(rlm.Address(), p.To, chain.Coins{{Denom: "ugnot", Amount: p.Amount}})
 }
 
 func get(id uint64) *escrow.Quest {
-	v := quests.Get(strconv.FormatUint(id, 10))
+	v := quests.Get(key(id))
 	if v == nil {
 		panic("unknown quest")
 	}
 	return v.(*escrow.Quest)
+}
+
+// key zero-pads the id to 20 digits so the tree's order is numeric order.
+func key(id uint64) string {
+	s := strconv.FormatUint(id, 10)
+	return strings.Repeat("0", 20-len(s)) + s
 }
 
 func check(err error) {
@@ -257,7 +320,9 @@ func check(err error) {
 }
 ```
 
-Moves that can release money (`Cancel`, `Unclaim`, `Release`, `Approve`, `Reject`, `ClaimPayout`) return an `escrow.Payout{Kind, To, Amount}`; send it only when `p.Due()` is true (for example `Unclaim` pays nothing unless the poster closed the quest). `Claim` and `Submit` return only an error. A real realm should also refuse coins on calls that do not take them, as `r/questmaster` does. The full API is documented in `p/escrow/escrow.gno`.
+Moves that can release money (`Cancel`, `Unclaim`, `Release`, `Approve`, `Reject`, `ClaimPayout`) return an `escrow.Payout{Kind, To, Amount}`; send it only when `p.Due()` is true (for example `Unclaim` pays nothing unless the poster closed the quest). `Claim` and `Submit` return only an error. The full API is documented in `p/escrow/escrow.gno`.
+
+`p/escrow/z_example_filetest.gno` holds an earlier, shorter version of this example. It was uploaded with the package and cannot change; it checks only `Post`, keys by unpadded id and skips the coin check on the other calls. Use the version above.
 
 ## Run it locally
 
@@ -283,6 +348,7 @@ r/questmaster/            realm: storage, coins, public functions, events, pages
   questmaster.gno         state-changing and read functions
   render.gno, escape.gno  gnoweb pages and escaping
   *_test.gno, filetests/  tests, golden pages, events
+docs/examples/bounty/     the README's escrow example, compiled and tested
 scripts/local-flow.sh     full flow on a local node
 scripts/set-namespace.sh  replace the placeholder namespace before deploying
 web/                      the web app (static site, Adena wallet)
@@ -294,14 +360,18 @@ Events on every change, for indexers: `QuestPosted`, `QuestClaimed`, `QuestUncla
 
 ## Roadmap
 
-- Smaller storage per quest: per-user id lists instead of one tree per user, and no separate open-quest index, would cut the posting deposit from about 0.76 to about 0.4 GNOT.
-- A simple dispute step (for example a neutral reviewer chosen at post time) instead of the poster alone deciding.
-- Optional rewards in GRC20 tokens.
-- Calls from other realms and DAOs, so a DAO can post and pay quests.
+- Smaller storage per quest: one global index keyed `address/questKey` instead of one tree per user (each tree costs about 2,000 bytes per entry), which would cut the posting deposit.
+- Calls from realms and DAOs on the moves that take no coins, so a DAO or another realm can claim, approve or run quests.
+- A per-quest escrow sub-address, so every quest's reward is its own visible balance on chain.
+- A simple dispute step instead of the poster alone deciding.
+
+Any of these needs a new version, deployed at new paths ending in `/v2` (`gno.land/p/…/escrow/v2`, `gno.land/r/…/questmaster/v2`); deployed packages never change.
 
 ## Licence and credits
 
-QuestMaster's own code is licensed under the **Apache License, Version 2.0** (see `LICENSE` and `NOTICE`). Copyright 2026 Fluxen. That licence covers only the code written for QuestMaster in this repository.
+QuestMaster's own code in this repository is licensed under the **Apache License, Version 2.0** (see `LICENSE` and `NOTICE`). Copyright 2026 Fluxen.
+
+The copy published on the Gno.land network is, in addition, made available under the **GNO Network General Public License, version 6**, including its Additional Terms on Strong Attribution: the network's terms of use (Network Interaction Terms, section 5, `TERMS.md` in github.com/gnolang/gno) say that any code published for execution on the network is made available under that licence. The "Built on gno.land" link on every page is that attribution.
 
 QuestMaster imports these packages on chain. They are not copied into this repository; they come from github.com/gnolang/gno and stay under their own licence, the GNO Network General Public License, version 6, including its attribution terms. QuestMaster's licence does not relicense them.
 

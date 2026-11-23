@@ -131,8 +131,11 @@ Each action is one `/vm.m_call` message:
              "func": "ClaimQuest", "args": ["7"] } }
 ```
 
-Only `PostQuest` has a `send` (`"5000000ugnot"`). Adena's `DoContract` takes
-no gas fields: the wallet estimates the fee and shows it before signing. The
+Only `PostQuest` has a `send` (`"5000000ugnot"`).
+
+**With Adena, the wallet chooses the network fee.** `DoContract` takes no gas
+fields: Adena estimates the fee and shows it before you sign; the app cannot
+set it. The
 `gnokey` commands the app shows use `-gas-wanted 10000000 -gas-fee
 100000ugnot`, the same as the realm's help page.
 
