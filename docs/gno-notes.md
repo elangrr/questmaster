@@ -62,7 +62,7 @@ Assumed block time for the constants: 3.5 s.
 | Constant (p/escrow) | Target | Maths at 3.5 s | Chosen | Real time at 3.42 s / 3.55 s |
 |---|---|---|---|---|
 | `MinWorkBlocks` | about 1 hour | 3,600 / 3.5 = 1,029 | 1,000 | 57 min / 59 min |
-| `ReviewBlocks` | about 3 days | 259,200 / 3.5 = 74,057 | 75,000 | 2.97 d / 3.08 d |
+| `ReviewBlocks` | about 3 days (task 2; raised to 7 days in task 5) | 604,800 / 3.5 = 172,800 | 172,800 | 6.84 d / 7.10 d |
 | `MaxWorkBlocks` | about 90 days | 7,776,000 / 3.5 = 2,221,714 | 2,200,000 | 87 d / 90 d |
 
 The block time can change with chain upgrades, so the README should state windows in blocks with the

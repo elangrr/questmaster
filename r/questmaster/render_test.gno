@@ -282,6 +282,7 @@ func TestFormatHelpers(t *testing.T) {
 	uassert.Equal(t, "about a minute", approx(10))
 	uassert.Equal(t, "about 58 minutes", approx(1_000))
 	uassert.Equal(t, "about 3 days", approx(75_000))
+	uassert.Equal(t, "about 7 days", approx(escrow.ReviewBlocks))
 	uassert.Equal(t, "about 89 days", approx(2_200_000))
 	uassert.Equal(t, "passed", left(10, 11))
 	uassert.Equal(t, "about a minute left", left(10, 10))
