@@ -6,6 +6,8 @@ const REALM = process.env.QM_REALM!;
 const SHOTS = "e2e/out/screenshots";
 const POSTER = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const BUILDER = "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj";
+const OTHER = "g1u7y667z64x2h7vc6fmpcprgey4ck233jaww9zq";
+const NEWCOMER = "g1" + "q".repeat(38); // the realm has no quests for it
 
 const open = (page: Page, route: string) => page.goto(`${APP}#${route}`);
 
@@ -35,8 +37,8 @@ test("board: totals, 20 open quests newest first, paging", async ({ page }) => {
   const stats = page.locator(".stats");
   await expect(stats).toContainText("25open quests");
   await expect(stats).toContainText("38.234567GNOT locked");
-  await expect(stats).toContainText("2.5GNOT paid out");
-  await expect(stats).toContainText("1quests paid");
+  await expect(stats).toContainText("3.5GNOT paid out");
+  await expect(stats).toContainText("2quests paid");
   const rows = page.locator("table.quests tbody tr");
   await expect(rows).toHaveCount(20);
   await expect(rows.first()).toContainText("Small task 24");
@@ -112,9 +114,9 @@ test("without a wallet, actions explain and offer gnokey and gnoweb", async ({ p
 
 test("paid page, address pages, bad routes", async ({ page }) => {
   await open(page, "/paid");
-  await expect(page.locator("table.quests tbody tr")).toHaveCount(1);
+  await expect(page.locator("table.quests tbody tr")).toHaveCount(2);
   await open(page, `/address/${BUILDER}?as=builder`);
-  await expect(page.locator("table.quests tbody tr")).toHaveCount(5);
+  await expect(page.locator("table.quests tbody tr")).toHaveCount(7);
   await open(page, `/address/${POSTER}`);
   await expect(page.locator("table.quests tbody tr")).toHaveCount(7);
   await open(page, "/address/g1nope");
@@ -354,6 +356,76 @@ test("quest page: stepper, deadline bar, reject count", async ({ page }) => {
   await expect(page.locator(".stepper .step.exit")).toContainText("Refunded");
 });
 
+test("track record: summaries on the quest page, caution before claiming", async ({ page }) => {
+  // Quest 31 is posted by OTHER, who rejected work 3 times and took two rewards back.
+  await open(page, "/quest/31");
+  const posterLine = page.locator('[data-record="poster"]');
+  await expect(posterLine).toContainText("Paid 0 of 2 finished quests · rejected work 3 times");
+  await expect(posterLine.getByRole("link", { name: "Record" })).toHaveAttribute("href", `#/address/${OTHER}`);
+  const claim = page.locator(".action", { hasText: "Take this quest" });
+  await claim.getByRole("button", { name: "Other ways" }).click();
+  await expect(claim.locator('[data-poster-note="caution"]')).toHaveText(
+    /^!This poster has rejected work 3 times on 2 quests, and 2 quests were refunded to them after a rejection\. A poster can turn down work/,
+  );
+
+  // Quest 34: a clean poster (paid, never rejected) and a builder with history.
+  await open(page, "/quest/34");
+  const clean = page.locator('[data-record="poster"]');
+  await expect(clean).toContainText("Paid 1 of 1 finished quest · never rejected work");
+  await expect(clean.locator(".rec-mark.good")).toHaveText("✓");
+  await expect(page.locator('[data-record="builder"]')).toContainText("Paid for 1 of 2 quests taken · 1 in progress");
+});
+
+test("track record: the address page shows both roles and what cannot be known", async ({ page }) => {
+  await open(page, `/address/${OTHER}`);
+  const poster = page.locator('[data-record-card="poster"]');
+  await expect(poster.locator(".rec-headline")).toHaveText("Paid 0 of 2 finished quests · rejected work 3 times");
+  await expect(poster.locator(".rec-stat")).toHaveText(["Posted26", "Paid0", "Open or in progress24", "Cancelled or refunded2", "Rejections3", "Refunded after a rejection2"]);
+  const builder = page.locator('[data-record-card="builder"]');
+  await expect(builder.locator(".rec-headline")).toHaveText("Paid for 1 of 2 quests taken · 1 in progress");
+
+  await open(page, `/address/${BUILDER}`);
+  const b = page.locator('[data-record-card="builder"]');
+  await expect(b.locator(".rec-headline")).toHaveText("Paid for 1 of 7 quests taken · 2 in progress · 4 ended without pay");
+  await expect(b).toContainText("1 on quests never rejected (so this builder gave them back or missed the deadline) and 3 on quests with rejections");
+  await expect(b).toContainText("not who was rejected");
+
+  await open(page, `/address/${NEWCOMER}`);
+  await expect(page.locator('[data-record-card="poster"]')).toContainText("No history yet.");
+  await expect(page.locator('[data-record-card="builder"]')).toContainText("No history yet.");
+});
+
+test("track record: fails quietly and never blocks the quest", async ({ page }) => {
+  // Every by-address read fails; the quest itself still loads.
+  await page.route("http://127.0.0.1:36657/", async (route) => {
+    const data = route.request().postDataJSON()?.params?.data ?? "";
+    if (Buffer.from(data, "base64").toString().includes("CountBy")) return route.fulfill({ status: 500, body: "nope" });
+    return route.continue();
+  });
+  await open(page, "/quest/4");
+  await expect(page.locator("h1.quest-title")).toHaveText("Add a dark theme to the demo page");
+  await page.waitForTimeout(800);
+  await expect(page.locator('[data-record="poster"]')).toHaveText("");
+  await expect(page.locator(".state-box.error")).toHaveCount(0);
+});
+
+test("positioning: for people and AI agents, with example quests", async ({ page }) => {
+  await open(page, "/");
+  await expect(page.locator(".hero-for")).toHaveText("For people and AI agents: whoever does the work gets paid when the poster approves.");
+  await expect(page.locator("h1#hero-title")).toHaveText("Small tasks, paid in GNOT");
+  expect(await page.locator('meta[property="og:description"]').getAttribute("content")).toContain("people and AI agents");
+  const examples = ["Find a bug in my realm", "Test this on your phone and report", "Review this translation", "Check my node setup guide by following it", "Give feedback on my demo video"];
+  await open(page, "/how");
+  await expect(page.locator(".examples li")).toHaveText(examples.map((e) => `“${e}”`));
+  await expect(page.locator("main")).toContainText("A poster can turn down finished work and take the reward back");
+  await expect(page.locator("main")).toContainText("check the poster's record before you claim");
+  await open(page, "/post");
+  expect(examples).toContain(await page.getByLabel("Title").getAttribute("placeholder"));
+  await open(page, "/agents");
+  await expect(page.locator(".lead")).toContainText("an AI agent can take part like anyone else");
+  await expect(page.locator("main")).toContainText("No write was run.");
+});
+
 test("keyboard: skip link and focusable controls", async ({ page }) => {
   await open(page, "/");
   await page.keyboard.press("Tab");
@@ -378,6 +450,8 @@ for (const scheme of ["light", "dark"] as const) {
         ["/post", "post"],
         ["/how", "how"],
         ["/agents", "agents"],
+        ["/quest/34", "quest-record-clean"],
+        [`/address/${OTHER}`, "address-record"],
       ] as const) {
         await page.goto(`${APP}#${route}`);
         await page.locator("main h1").first().waitFor();
@@ -385,6 +459,14 @@ for (const scheme of ["light", "dark"] as const) {
         await page.waitForTimeout(1000); // entrance and count-up finished
         await page.screenshot({ path: `${SHOTS}/${file}-${name}-${scheme}.png`, fullPage: true });
       }
+      // The caution a builder sees before claiming (quest 31's poster rejected work).
+      await page.goto(`${APP}#/quest/31`);
+      await page.locator('[data-record="poster"] a').waitFor();
+      const claim = page.locator(".action", { hasText: "Take this quest" });
+      await claim.getByRole("button", { name: "Other ways" }).click();
+      await claim.locator("[data-poster-note]").waitFor();
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${SHOTS}/quest-caution-${name}-${scheme}.png`, fullPage: true });
       await ctx.close();
     });
   }

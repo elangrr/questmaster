@@ -534,3 +534,31 @@ table.quests { width: 100%; border-collapse: collapse; }
 .big-reward .usd { font: 500 var(--t-m) var(--font); }
 .big-reward .unit { font-family: var(--font); }
 .callout:has(> .callout-icon) { display: flex; gap: 10px; }
+
+/* ------------------------------------------------------------ track records */
+.rec-line { display: block; min-height: 1.5em; margin-top: 4px; font-size: var(--t-s); color: var(--ink-2); line-height: 1.5; }
+.rec-mark { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; font-weight: 800; flex: none; align-self: center; }
+.rec-mark.good { background: var(--ok-soft); color: var(--ok); }
+.rec-mark.caution { background: var(--amber-soft); color: var(--amber-ink); }
+.rec-note { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; font-size: var(--t-s); }
+.rec-note .rec-mark { margin-top: 1px; }
+.rec-note.caution { background: var(--amber-soft); border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); color: var(--ink); }
+.rec-note.good { background: var(--ok-soft); border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); color: var(--ink); }
+.record { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin: var(--s-4) 0 var(--s-5); }
+.record-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow-1); min-height: 210px; }
+.record-card h2 { font-size: var(--t-l); margin: 0 0 8px; }
+.rec-headline { font: 700 1.05rem/1.35 var(--serif); margin: 0 0 10px; }
+.rec-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin: 0 0 10px; }
+.rec-stat { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+.rec-stat dt { font-size: var(--t-xs); color: var(--muted); }
+.rec-stat dd { margin: 0; font: 700 1.25rem/1.2 var(--serif); font-variant-numeric: tabular-nums; }
+.rec-stat.good dd { color: var(--ok); }
+.rec-stat.caution dd { color: var(--amber-ink); }
+.record-sk { display: grid; gap: 10px; padding-top: 4px; }
+.tabs-title { margin: var(--s-5) 0 0; font-size: var(--t-l); }
+.rec-line .rec-mark { display: inline-grid; vertical-align: -3px; margin-right: 6px; }
+@media (min-width: 700px) { .facts > .fact-wide { grid-column: span 2; } }
+@media (max-width: 699px) { .rec-line { min-height: 3em; } }
+.hero .hero-for { font-weight: 600; color: var(--brand); margin: 0 0 var(--s-3); font-size: 1.08rem; }
+.examples { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.examples li { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-family: var(--serif); }

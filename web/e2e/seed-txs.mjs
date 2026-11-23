@@ -1,7 +1,8 @@
 // Writes a gnodev genesis transactions file (one JSON tx per line) that puts
 // the QuestMaster realm into a known state: quests in every state that can be
 // reached at genesis height (no blocks pass, so no timeout payout), a closing
-// quest, a quest with hostile text, and more than one page of open quests.
+// quest, a quest with hostile text, more than one page of open quests, a
+// poster who rejects work and takes rewards back, and a poster with a clean record.
 // Genesis transactions need no signature, only the caller's public key; these
 // are the standard gnodev test accounts. No key is created or used.
 //
@@ -66,5 +67,26 @@ tx(BUILDER, "SubmitWork", "", hostile, HOSTILE_LINK);
 tx(POSTER, "RejectWork", "", hostile, HOSTILE_REASON);
 // 8..31: 24 open quests from another poster, so the open list has two pages
 for (let i = 1; i <= 24; i++) post(`Small task ${i}`, `Details of small task ${i}.`, 1000000 + i * 10000, 1000, OTHER);
+// 32, 33: the same poster (OTHER) rejects finished work and takes the reward
+// back: the pattern the track record makes visible. Neither stays open.
+// 32: closed while the work was under review, then rejected: refunded at once.
+const troll1 = post("Proofread my landing page", "", 1100000, 20000, OTHER);
+tx(BUILDER, "ClaimQuest", "", troll1);
+tx(BUILDER, "SubmitWork", "", troll1, "https://github.com/example/site/pull/3");
+tx(OTHER, "CancelQuest", "", troll1);
+tx(OTHER, "RejectWork", "", troll1, "Not what I wanted.");
+// 33: rejected twice, then cancelled while open: refunded.
+const troll2 = post("Test my realm on a phone", "", 1200000, 20000, OTHER);
+for (const link of ["https://example.com/report-1", "https://example.com/report-2"]) {
+  tx(BUILDER, "ClaimQuest", "", troll2);
+  tx(BUILDER, "SubmitWork", "", troll2, link);
+  tx(OTHER, "RejectWork", "", troll2, "Needs more detail.");
+}
+tx(OTHER, "CancelQuest", "", troll2);
+// 34: a poster with a clean record (BUILDER posts; OTHER builds; approved).
+const clean = post("Review my translation", "Spanish, two pages.", 1000000, 20000, BUILDER);
+tx(OTHER, "ClaimQuest", "", clean);
+tx(OTHER, "SubmitWork", "", clean, "https://example.com/review");
+tx(BUILDER, "ApproveWork", "", clean);
 
 process.stdout.write(out.join("\n") + "\n");

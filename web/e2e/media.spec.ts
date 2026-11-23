@@ -94,6 +94,7 @@ test("video: a mocked-wallet transaction from click to success", async ({ browse
 test("lighthouse: board and a quest page, phone profile", async () => {
   test.setTimeout(240_000);
   const run = promisify(execFile);
+  mkdirSync(OUT, { recursive: true });
   const results: Record<string, Record<string, number>> = {};
   for (const [name, route] of [["board", "/"], ["quest-4", "/quest/4"]] as const) {
     const file = join(OUT, `lighthouse-${name}.json`);

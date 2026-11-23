@@ -5,6 +5,7 @@ import { invalidate, read } from "../lib/rpc";
 import { sendTx, WalletError } from "../lib/wallet";
 import { thousands } from "../lib/format";
 import { CoinBurst } from "./visuals";
+import { forgetRecords } from "./record";
 import { CopyButton, Gnot } from "./parts";
 import { useWallet } from "./WalletContext";
 
@@ -77,6 +78,7 @@ export function TxPanel({ spec, onDone, note, fallbackOpen = false }: { spec: Tx
       setHash(r.hash);
       setPhase("sent");
       invalidate();
+      forgetRecords();
       const b = await confirmed(r.height);
       setBlock(b);
       setPhase("confirmed");

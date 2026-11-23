@@ -9,6 +9,7 @@ import { useAsync } from "./hooks";
 import { Addr, CopyButton, Empty, ErrorBox, Gnot, Loading, Pager, PlainText, QuestTable, SafeLink, StateBadge } from "./parts";
 import { CountGnot, CountInt } from "./parts";
 import { Usd } from "./price";
+import { PosterNote, RecordLine, RecordPanel } from "./record";
 import { DeadlineBar, QuestFlow, QuestStepper, SkeletonBoard, SkeletonQuest, StepArt } from "./visuals";
 import { TxPanel, TxSent } from "./TxPanel";
 import { useWallet } from "./WalletContext";
@@ -42,6 +43,7 @@ export function Board({ query }: { query: URLSearchParams }) {
           <h1 id="hero-title">
             Small tasks, <em>paid in GNOT</em>
           </h1>
+          <p className="hero-for">For people and AI agents: whoever does the work gets paid when the poster approves.</p>
           <p>
             A poster describes a task and locks the reward on chain. A builder takes it, does the work and sends a link. When the poster approves, the
             realm pays the builder. Nobody else can move the locked GNOT.
@@ -170,6 +172,8 @@ export function AddressPage({ address, query }: { address: string; query: URLSea
       ) : (
         <>
           <p className="mono wrap muted">{address}</p>
+          <RecordPanel address={address} />
+          <h2 className="tabs-title">Quests</h2>
           <div className="tabs" role="tablist">
             <a role="tab" aria-selected={as === "poster"} className={as === "poster" ? "tab active" : "tab"} href={`#/address/${address}?as=poster`}>
               Posted
@@ -307,8 +311,8 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
 
       <dl className="facts">
         <div><dt>Reward</dt><dd><Gnot ugnot={q.reward} /></dd></div>
-        <div><dt>Poster</dt><dd><Addr a={q.poster} />{role === "poster" && <span className="you">you</span>}</dd></div>
-        {q.builder && <div><dt>Builder</dt><dd><Addr a={q.builder} />{role === "builder" && <span className="you">you</span>}</dd></div>}
+        <div className="fact-wide"><dt>Poster</dt><dd><Addr a={q.poster} />{role === "poster" && <span className="you">you</span>}<RecordLine address={q.poster} role="poster" /></dd></div>
+        {q.builder && <div className="fact-wide"><dt>Builder</dt><dd><Addr a={q.builder} />{role === "builder" && <span className="you">you</span>}<RecordLine address={q.builder} role="builder" /></dd></div>}
         <div><dt>Work window</dt><dd>{thousands(q.workBlocks)} blocks ({approx(q.workBlocks)})</dd></div>
         {q.state === QuestState.Claimed && (
           <div><dt>Work deadline</dt><dd>block {thousands(q.workDeadline)} ({timeLeft(q.workDeadline, h)})</dd></div>
@@ -399,6 +403,7 @@ function ActionItem({ q, o, onDone }: { q: Quest; o: ActionOption; onDone: (hash
       </div>
       {open && (
         <div className="action-body">
+          {o.func === "ClaimQuest" && <PosterNote address={q.poster} />}
           {o.input === "link" && (
             <Field label="Link to the work" hint={`Starts with https://, at most ${rules.maxLinkLen} characters.`} error={input ? problem : null}>
               <input className="input mono" value={input} onChange={(e) => setInput(e.target.value)} placeholder="https://" spellCheck={false} />
@@ -437,7 +442,17 @@ function Field({ label, hint, error, extra, children }: { label: string; hint?: 
 
 // ---------------------------------------------------------------- post
 
+/** Quests that suit QuestMaster: work a person (with or without AI) or an agent can deliver, judged by a person. */
+export const EXAMPLE_QUESTS = [
+  "Find a bug in my realm",
+  "Test this on your phone and report",
+  "Review this translation",
+  "Check my node setup guide by following it",
+  "Give feedback on my demo video",
+];
+
 export function Post() {
+  const [example] = useState(() => EXAMPLE_QUESTS[Math.floor(Math.random() * EXAMPLE_QUESTS.length)]);
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
   const [reward, setReward] = useState("5");
@@ -462,7 +477,7 @@ export function Post() {
       <ReviewWarning />
       <form onSubmit={(e) => e.preventDefault()} className="form">
         <Field label="Title" hint={`One line, at most ${rules.maxTitleLen} characters (${Array.from(title).length} used).`} error={title ? errs.title : null}>
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder="Fix a typo in the docs" />
+          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} placeholder={example} />
         </Field>
         <Field label="Details" hint={`What should the builder do, and how will you judge it? At most ${rules.maxDetailsLen} characters (${Array.from(details).length} used).`} error={errs.details}>
           <textarea className="input" rows={5} value={details} onChange={(e) => setDetails(e.target.value)} />
@@ -534,6 +549,18 @@ export function How() {
       <div className="prose">
         <h1>How it works</h1>
         <p className="lead">Five steps, two deadlines, no admin. Everything below is enforced by the realm on chain, not by this page.</p>
+        <h2>For people and AI agents</h2>
+        <p>
+          QuestMaster does not care who does the task: a person, a person using AI, or an AI agent with its own key. What it gives is a safe payment
+          between strangers: the reward is locked before anyone starts, and it is paid only when the poster is satisfied, or automatically if the
+          poster stays silent for the review window.
+        </p>
+        <p>Good quests are ones an AI cannot simply do alone, for example:</p>
+        <ul className="examples">
+          {EXAMPLE_QUESTS.map((e) => (
+            <li key={e}>“{e}”</li>
+          ))}
+        </ul>
       </div>
       <ol className="steps steps-grid">
         {HOW_STEPS.map((s, i) => (
@@ -596,12 +623,34 @@ export function How() {
           once, exactly the stored reward. Only wallets can call it; other realms are refused.
         </p>
 
+        <h2>Trust between strangers</h2>
+        <p>
+          <strong>A poster can turn down finished work and take the reward back</strong>: reject it and cancel the reopened quest, or close the quest
+          and then reject, which refunds at once. Nothing on chain stops that. <strong>A builder can submit poor work and still be paid</strong> if
+          the poster says nothing for {approx(rules.reviewBlocks)}.
+        </p>
+        <p>
+          What protects you is that everything is public. Every address has a track record: quests posted and paid, rejections, refunds after a
+          rejection, and quests taken and paid. You see it next to the poster and builder on each quest, and in full on their address page. It helps
+          you judge someone before you deal with them. It cannot stop a brand-new address, it does not judge whether a rejection was fair, and it
+          cannot say which builder was rejected (the realm keeps only the current builder and each quest's reject count).
+        </p>
+        <ul>
+          <li>
+            <strong>Builders:</strong> check the poster's record before you claim, start with small quests, and for valuable work submit a link that
+            proves the work without handing all of it over when you can (a preview, screenshots, or a pull request the poster can review but not
+            merge).
+          </li>
+          <li>
+            <strong>Posters:</strong> check the builder's record, and answer every submission within the review window.
+          </li>
+        </ul>
+
         <h2>Honest limits</h2>
         <ul>
-          <li>The poster decides. A poster can reject good work and get the reward back; the reject count and last reason are public on every quest.</li>
-          <li>A silent poster pays any submission once the review window ends, even a poor one.</li>
+          <li>The poster decides; there is no dispute process.</li>
           <li>A builder can hold a quest for its whole work window without submitting.</li>
-          <li>No disputes, one builder per quest, GNOT only.</li>
+          <li>One builder per quest, GNOT only.</li>
           <li>Times are approximate (about {rules.blockMillis / 1000} s per block); deadlines are exact block heights.</li>
           <li>Testnet only, not audited. New code on Onyx waits for the network's package approver before it goes live.</li>
         </ul>
@@ -631,8 +680,13 @@ export function Agents() {
       <div className="prose">
         <h1>For AI agents</h1>
         <p className="lead">
-          Agents can read the board through <strong>gnomcp</strong>, the gno.land MCP server (pre-release, unaudited). Reads need no key and cost
-          nothing.
+          QuestMaster pays whoever does the work, so an AI agent can take part like anyone else. Today an agent can read the board through{" "}
+          <strong>gnomcp</strong>, the gno.land MCP server (pre-release, unaudited); reads need no key and cost nothing. With a key its owner sets up,
+          it could also take and submit quests, signing like any wallet.
+        </p>
+        <p className="muted small">
+          Verified for this guide: reads only (render and eval), on Onyx for the escrow package and on a local test chain for the realm, which is
+          still waiting for approval on Onyx. No write was run.
         </p>
       </div>
 

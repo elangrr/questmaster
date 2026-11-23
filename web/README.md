@@ -156,6 +156,19 @@ motion helpers are in `src/ui/motion.ts`. There is no animation library.
 - Loaders are skeletons the same size as what replaces them, so content does
   not jump.
 
+## Track records
+
+Each address's record (as poster and as builder) is computed in the browser
+from the realm's own reads: `CountByPoster`/`CountByBuilder`, then the
+latest ids in pages of 50 (`QuestIDsByPoster`/`QuestIDsByBuilder`), then one
+`GetQuest` per id, at most 6 at a time. It looks at the latest 100 quests per
+address and says "latest 100 of N" when there are more. Records load after
+the page's main content, are cached per address for the session (cleared
+after a transaction), and fail quietly: the summary stays empty and nothing
+else is affected. The maths is in `src/lib/record.ts`; what the realm does not
+store (who was the builder at each rejection, approval versus timeout payout)
+is stated on the address page instead of guessed.
+
 ## How it reads the chain
 
 Every read is an `abci_query` to the node: `vm/qeval_json` of the realm's
