@@ -7,10 +7,10 @@ import (
 )
 
 var (
-	poster   = chain.PackageAddress("questboard/test/poster")
-	builder  = chain.PackageAddress("questboard/test/builder")
-	builder2 = chain.PackageAddress("questboard/test/builder2")
-	stranger = chain.PackageAddress("questboard/test/stranger")
+	poster   = chain.PackageAddress("questmaster/test/poster")
+	builder  = chain.PackageAddress("questmaster/test/builder")
+	builder2 = chain.PackageAddress("questmaster/test/builder2")
+	stranger = chain.PackageAddress("questmaster/test/stranger")
 )
 
 const (

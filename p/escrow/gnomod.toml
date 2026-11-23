@@ -1,2 +1,2 @@
-module = "gno.land/p/questboard_dev/escrow"
+module = "gno.land/p/questmaster_dev/escrow"
 gno = "0.9"

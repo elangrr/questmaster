@@ -1,10 +1,10 @@
-# Questboard: build plan for the Gnome Tavern hackathon
+# QuestMaster: build plan for the Gnome Tavern hackathon
 
 Deadline: 18 Dec 2026, 01:00 UTC (08:00 WIB). Target finish: 15 Dec.
 
 ## 1. Goal
 
-Questboard is a bounty board on Gno.land. Someone posts a small task and locks GNOT as the reward. A builder takes the task and sends a link to the work. The poster approves, and the realm pays the builder. The board shows as a page in gnoweb (the Gno.land web viewer).
+QuestMaster is a bounty board on Gno.land. Someone posts a small task and locks GNOT as the reward. A builder takes the task and sends a link to the work. The poster approves, and the realm pays the builder. The board shows as a page in gnoweb (the Gno.land web viewer).
 
 Done means all of these are true:
 
@@ -71,21 +71,21 @@ Note on Reject: a poster could reject good work many times. In version 1, keep a
 ## 5. Code layout
 
 ```
-questboard/
+questmaster/
   p/escrow/            pure package: quest type, states, rules (no coins)
     escrow.gno
     escrow_test.gno
     gnomod.toml
-  r/questboard/        realm: storage, coins, public functions, Render
-    questboard.gno
+  r/questmaster/        realm: storage, coins, public functions, Render
+    questmaster.gno
     render.gno
-    questboard_test.gno
+    questmaster_test.gno
     gnomod.toml
   README.md
   docs/demo-script.md
 ```
 
-Deploy paths: `gno.land/p/<your-namespace>/escrow` and `gno.land/r/<your-namespace>/questboard`. Make sure that you know the namespace rule on Onyx first. Some paths need a registered username. Read the "Deploying" page in the docs.
+Deploy paths: `gno.land/p/<your-namespace>/escrow` and `gno.land/r/<your-namespace>/questmaster`. Make sure that you know the namespace rule on Onyx first. Some paths need a registered username. Read the "Deploying" page in the docs.
 
 Why two packages: the `/p/` package holds the rules and does not change once deployed. Other realms can import it and trust that its logic cannot change. This counts for the "adoption" check of the retention prize. The realm holds the coins, because a pure package cannot hold coins.
 
@@ -146,7 +146,7 @@ Emit an event with `chain.Emit` on every state change (QuestPosted, QuestClaimed
 
 ## 9. gnoweb pages (Render)
 
-- `/r/<ns>/questboard` (home): short intro, totals (open quests, GNOT locked, GNOT paid), list of open quests with reward and title.
+- `/r/<ns>/questmaster` (home): short intro, totals (open quests, GNOT locked, GNOT paid), list of open quests with reward and title.
 - `:quest/<id>`: full quest, state, poster, builder, deadlines in blocks, work link, reject count. Show the ready-to-use call links for each action that gnoweb offers.
 - `:poster/<address>` and `:builder/<address>`: one user's quests.
 - `:paid`: finished quests, as proof that the board pays.
@@ -210,7 +210,7 @@ The retention prize needs mainnet, 50 real users by month 3, 100 by month 6, at 
 
 ## 14. README outline
 
-1. What Questboard does, in three sentences
+1. What QuestMaster does, in three sentences
 2. Live links: realm on Onyx, example quest, GnoScan transactions
 3. How to use it: post, take, submit, approve (with the gnokey commands and the gnoweb way)
 4. The rules: states table and deadlines
@@ -232,7 +232,7 @@ The retention prize needs mainnet, 50 real users by month 3, 100 by month 6, at 
 ## 16. Starter prompt for Claude Code in Orca
 
 ```
-Build Questboard, a GNOT bounty board on Gno.land, from questboard-plan.md in this folder.
+Build QuestMaster, a GNOT bounty board on Gno.land, from docs/plan.md.
 Start with section 5 (layout) and p/escrow with its tests. Follow sections 4, 7, 8 and 10 exactly.
 Gno is not Go: before using any import or function, look it up in the Gno docs or with gnomcp. Do not guess APIs.
 Run gno test after every change and show me the real output. Stop and ask before deploying anything.
@@ -240,7 +240,7 @@ Run gno test after every change and show me the real output. Stop and ask before
 
 ## 17. Submission checklist
 
-- [ ] `/p/escrow` and `/r/questboard` deployed on Onyx
+- [ ] `/p/escrow` and `/r/questmaster` deployed on Onyx
 - [ ] One full quest done with two wallets, links saved
 - [ ] All tests pass
 - [ ] Repo public, README done

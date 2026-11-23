@@ -1,4 +1,4 @@
-# Gno notes for Questboard
+# Gno notes for QuestMaster
 
 Checked on 2026-11-23 against gno **v1.8.0** (commit `fc79041f4cd1a7b3ed4b316dc5ac14162eb78730`), the version that both
 mainnet (`gnoland-1`) and Onyx (`onyx-1`, as `v1.8.0-rc.1` at the same commit) run.
@@ -32,16 +32,16 @@ gno repo at that tag.
 
 ## Namespace (decision still open)
 
-`p/escrow/gnomod.toml` uses the placeholder `gno.land/p/questboard_dev/escrow`, which works for local `gno test`.
+`p/escrow/gnomod.toml` uses the placeholder `gno.land/p/questmaster_dev/escrow`, which works for local `gno test`.
 
 What the docs say:
 
 - Anyone can deploy under their own address namespace, `gno.land/p/<g1-address>/...` and `gno.land/r/<g1-address>/...`, with nothing to register (https://docs.gno.land/resources/users-and-teams, https://docs.gno.land/builders/deploy-packages).
 - A name namespace (`gno.land/r/<name>/...`) needs the name registered in `r/sys/users` first. One registered name owns both `r/<name>/*` and `p/<name>/*` (`examples/gno.land/r/sys/names/verifier.gno`). The users-and-teams page still says username namespaces are "not currently supported", which is out of date against the verifier code.
-- Onyx enables this name check from block 1 (`r/sys/names.Enable` at genesis, per the Onyx deployment README), so the placeholder `questboard_dev` path cannot be deployed on Onyx unless that exact name is registered to the deploying key.
+- Onyx enables this name check from block 1 (`r/sys/names.Enable` at genesis, per the Onyx deployment README), so the placeholder `questmaster_dev` path cannot be deployed on Onyx unless that exact name is registered to the deploying key.
 
 Change before deployment:
 
 1. `p/escrow/gnomod.toml`: `module = "gno.land/p/<namespace>/escrow"`.
-2. `r/questboard/gnomod.toml` (later task): its `module` line, and its import of `gno.land/p/<namespace>/escrow`.
-3. Any import of the escrow package in tests or docs (`grep -rn questboard_dev .`).
+2. `r/questmaster/gnomod.toml` (later task): its `module` line, and its import of `gno.land/p/<namespace>/escrow`.
+3. Any import of the escrow package in tests or docs (`grep -rn questmaster_dev .`).
