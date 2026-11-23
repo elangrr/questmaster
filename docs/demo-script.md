@@ -9,7 +9,7 @@ the wait out afterwards.
 - [ ] Realm and escrow live on Onyx (`docs/deploy.md`); note the realm URL.
 - [ ] Two test-only wallets in Adena, named **Poster** and **Builder** (not your real name). Switched to Onyx.
 - [ ] Both funded from the Onyx Faucet: Poster at least 30 test GNOT, Builder at least 5.
-- [ ] One quest already **paid** before recording (post, claim, submit, approve), so the Paid page is not empty.
+- [ ] One quest already **paid** before recording (post, take, submit, approve), so the Paid page is not empty.
 - [ ] One quest already **open** with a clear title, for example "Translate the README to Indonesian".
 - [ ] A real-looking work link ready to paste, for example a public pull request URL.
 - [ ] A terminal with the repo, already at the root, font large, `GNOHOME` set to a throwaway folder; run
@@ -28,7 +28,7 @@ the wait out afterwards.
 | 0:25 | gnoweb form for PostQuest | Type the title and details, work window `20000`. Turn on the switch that adds the 5 GNOT. Sign in Adena. | "The form already holds the reward. I confirm sending it, fill in the task, and sign. The 5 GNOT is now locked in the realm, not with me and not with anyone else." |
 | 0:45 | Home page | Reload; point at the new row and "GNOT locked". | "The quest is open, and the board shows the locked reward." |
 | 0:50 | Quest page | Open the quest. Point at "What can happen next". | "Every quest page shows only the moves that are possible now, and who may make them." |
-| 0:55 | Quest page | Switch Adena to **Builder**. Click "Open in gnoweb" next to Claim, sign. | "Now I'm the builder. I claim the quest. The work window starts now." |
+| 0:55 | Quest page | Switch Adena to **Builder**. On "Take this quest", click **Do this**, then **Take this quest**, and sign in Adena. | "Now I'm the builder. I take the quest. The work window starts now." |
 | 1:05 | Quest page | Reload. Click "Open in gnoweb" next to Submit work, paste the link, sign. | "I've done the work, so I submit a link to it." |
 | 1:15 | Quest page | Reload. Point at State "Submitted" and the review deadline. | "The poster now has about 7 days to approve or reject. If they never answer, the builder can claim the reward after that, so the board warns posters to check their quests." |
 | 1:20 | Quest page | Switch Adena to **Poster**. Click Approve, sign. | "Back as the poster. The work is good, so I approve." |
@@ -77,4 +77,4 @@ tabs on screen.
 | 0:40 | Web app | Hold on the quest page. | "QuestMaster: small tasks, paid in GNOT. Testnet only." |
 
 Do not show or run any write in this clip (`gno_call`, keys, faucet,
-sessions). If the agent offers to post or claim, decline on screen or cut it.
+sessions). If the agent offers to post or take a quest, decline on screen or cut it.

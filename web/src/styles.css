@@ -548,13 +548,18 @@ table.quests { width: 100%; border-collapse: collapse; }
 @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 .facts {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: 0;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 0;
   background: var(--surface); border: var(--border) solid var(--line); border-radius: var(--r-card); margin: var(--s-4) 0; overflow: hidden;
 }
 .facts > div { padding: var(--pad-cell); min-width: 0; }
 .facts > .deadline { grid-column: 1 / -1; border-bottom: var(--border) solid var(--line); }
+@media (min-width: 700px) {
+  .facts { grid-template-columns: repeat(var(--cols, 8), minmax(0, 1fr)); }
+  .facts > .fact-person { grid-column: span var(--half, 4); }
+  .facts > .fact-person.solo { grid-column: 1 / -1; }
+  .facts > .fact-short { grid-column: span 2; }
+}
 .deadline dd { display: grid; gap: var(--s-2); }
-@media (min-width: 700px) { .facts > .fact-wide { grid-column: span 2; } }
 .facts dd { margin: var(--s-1) 0 0; overflow-wrap: anywhere; font-size: var(--fs-body); line-height: var(--lh-body); }
 .you { margin-left: var(--s-2); display: inline-flex; align-items: center; height: var(--badge-h); padding: 0 var(--s-2); font-size: var(--fs-micro); font-weight: var(--fw-semibold); background: var(--brand-soft); color: var(--brand); border-radius: var(--r-pill); }
 .plain { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-size: var(--fs-body); }

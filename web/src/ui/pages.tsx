@@ -268,6 +268,7 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
   const options = actionsFor(q, h, w.address);
   const live = q.state !== QuestState.Paid && q.state !== QuestState.Cancelled;
   const finished = !live && lastTx !== null;
+  const shortFacts = q.workLink ? 5 : 4; // work window, (work), times rejected, posted at, current block
   return (
     <article className="quest">
       <p className="crumbs">
@@ -303,16 +304,19 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
       )}
       {q.state === QuestState.Submitted && role === "poster" && <ReviewWarning />}
 
-      <dl className="facts">
+      {/* Facts grid (>= 700 px): the deadline across the full width, then poster and builder as two
+          equal columns, then the short facts in one row. --cols = 2 x the number of short facts,
+          so both rows divide evenly and no cell is left alone. */}
+      <dl className="facts" style={{ ["--cols" as string]: shortFacts * 2, ["--half" as string]: shortFacts }}>
         {q.state === QuestState.Claimed && <DeadlineFact label="Work deadline" start={q.claimedAt} deadline={q.workDeadline} h={h} />}
         {q.state === QuestState.Submitted && <DeadlineFact label="Review deadline" start={q.submittedAt} deadline={q.reviewDeadline} h={h} />}
-        <div className="fact-wide"><dt>Poster</dt><dd><Addr a={q.poster} />{role === "poster" && <span className="you">you</span>}<RecordLine address={q.poster} role="poster" /></dd></div>
-        {q.builder && <div className="fact-wide"><dt>Builder</dt><dd><Addr a={q.builder} />{role === "builder" && <span className="you">you</span>}<RecordLine address={q.builder} role="builder" /></dd></div>}
-        <div><dt>Work window</dt><dd>{thousands(q.workBlocks)} blocks ({approx(q.workBlocks)})</dd></div>
-        {q.workLink && <div><dt>Work</dt><dd><SafeLink url={q.workLink} /></dd></div>}
-        <div><dt>Times rejected</dt><dd>{q.rejectCount}</dd></div>
-        <div><dt>Posted at block</dt><dd>{thousands(q.createdAt)}</dd></div>
-        <div><dt>Current block</dt><dd>{thousands(h)}</dd></div>
+        <div className={q.builder ? "fact-person" : "fact-person solo"}><dt>Poster</dt><dd><Addr a={q.poster} />{role === "poster" && <span className="you">you</span>}<RecordLine address={q.poster} role="poster" /></dd></div>
+        {q.builder && <div className="fact-person"><dt>Builder</dt><dd><Addr a={q.builder} />{role === "builder" && <span className="you">you</span>}<RecordLine address={q.builder} role="builder" /></dd></div>}
+        <div className="fact-short"><dt>Work window</dt><dd>{thousands(q.workBlocks)} blocks ({approx(q.workBlocks)})</dd></div>
+        {q.workLink && <div className="fact-short"><dt>Work</dt><dd><SafeLink url={q.workLink} /></dd></div>}
+        <div className="fact-short"><dt>Times rejected</dt><dd>{q.rejectCount}</dd></div>
+        <div className="fact-short"><dt>Posted at block</dt><dd>{thousands(q.createdAt)}</dd></div>
+        <div className="fact-short"><dt>Current block</dt><dd>{thousands(h)}</dd></div>
       </dl>
 
       <section>
@@ -621,8 +625,8 @@ export function How() {
             <strong>The reward</strong>, locked when you post, then paid to the builder or refunded to you. Exactly the amount you sent.
           </li>
           <li>
-            <strong>A storage deposit</strong>, kept by the chain for the data a call stores: about 0.65 to 0.8 GNOT to post, 0.2 to 0.3 GNOT for a
-            the first time a builder takes a quest, about 0.1 GNOT to approve.
+            <strong>A storage deposit</strong>, kept by the chain for the data a call stores: about 0.65 to 0.8 GNOT to post, 0.2 to 0.3 GNOT when a builder
+            takes their first quest, and about 0.1 GNOT to approve.
           </li>
           <li>
             <strong>The network fee.</strong> Adena chooses it and shows it before you sign; the gnokey commands pay 0.1 GNOT.

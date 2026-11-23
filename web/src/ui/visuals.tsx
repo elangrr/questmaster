@@ -140,7 +140,7 @@ export function DeadlineFact({ label, start, deadline, h }: { label: string; sta
   const pct = span > 0n ? Math.max(0, Math.min(100, Number((used * 1000n) / span) / 10)) : 100;
   const passed = h > deadline;
   return (
-    <div className={`fact-wide deadline ${passed ? "passed" : pct > 80 ? "soon" : ""}`}>
+    <div className={`deadline ${passed ? "passed" : pct > 80 ? "soon" : ""}`}>
       <dt>{label}</dt>
       <dd>
         <span className="deadline-when">

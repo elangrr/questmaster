@@ -139,6 +139,21 @@ price used and when it was fetched.
 - **Turn it off:** build with `VITE_GNOT_USD_SOURCE=off`, or set
   `VITE_GNOT_USD` to fix the price by hand.
 
+## Words: web app and realm
+
+The web app uses everyday words where the realm uses its function, state and
+event names; both mean the same thing:
+
+| Web app | Realm |
+|---|---|
+| Take this quest / taken | `ClaimQuest` / state `Claimed` / event `QuestClaimed` |
+| Give the quest back | `UnclaimQuest` |
+| Claim the reward | `ClaimPayout` |
+| Close quest / Cancel quest | `CancelQuest` |
+
+"Claim" in the web app only means claiming the reward after the review
+window.
+
 ## Design and motion
 
 **Sizing.** Every size comes from the tokens at the top of `src/styles.css`:

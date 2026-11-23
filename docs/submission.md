@@ -4,7 +4,7 @@ Project: **QuestMaster** · by Fluxen · Onyx testnet (`onyx-1`), test GNOT only
 
 ## Two sentences
 
-QuestMaster is a bounty board on gno.land for small tasks, open to people and AI agents alike: the poster locks the reward in a realm before anyone starts, and whoever does the work is paid when the poster approves. It gives strangers a safe payment without a middleman: a person judges the work, the contract holds the money, and a silent poster cannot stall the builder.
+QuestMaster is a bounty board on gno.land for small tasks, open to people and AI agents alike: the poster locks the reward in a realm before anyone starts, and whoever does the work is paid when the poster approves. It gives strangers a locked payment without a middleman: a person judges the work, the contract holds the money, and a silent poster cannot stall the builder.
 
 ## About 100 words
 

@@ -187,7 +187,7 @@ gnomcp signs a write with one of two identities, and both need setup first:
 - **An agent key** (the default). On a testnet profile the agent creates its
   own key with `gno_key_generate` and funds it with `gno_faucet_fund` (50
   test GNOT, once per address per 24 hours) or a transfer. That key then
-  posts, claims or approves quests **as itself**, a separate account from
+  posts, takes (`ClaimQuest`) or approves quests **as itself**, a separate account from
   yours. On a local gnodev profile it signs with gnodev's built-in `test1`
   key and needs no setup.
 - **A session as you.** `gno_session_propose` prints a

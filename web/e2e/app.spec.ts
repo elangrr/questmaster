@@ -659,6 +659,49 @@ test("navigation sets the page title and moves focus to the new page", async ({ 
   await expect(page).toHaveTitle("How it works · QuestMaster");
 });
 
+for (const width of [1280, 768, 390]) {
+  test(`quest facts: a regular grid in every state at ${width} px`, async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce" });
+    await mockPrice(ctx);
+    const page = await ctx.newPage();
+    const problems: string[] = [];
+    for (const [name, id] of [["open", 31], ["taken", 3], ["submitted", 4], ["closing", 5], ["paid", 1], ["cancelled", 2], ["hostile", 7]] as const) {
+      await page.goto(`${APP}#/quest/${id}`);
+      await page.locator("dl.facts").waitFor();
+      await page.waitForLoadState("networkidle");
+      problems.push(
+        ...(await page.evaluate(
+          ({ name, width }) => {
+            const out: string[] = [];
+            const dl = document.querySelector<HTMLElement>("dl.facts")!;
+            const box = dl.getBoundingClientRect();
+            const inner = box.width - 2; // minus the 1 px border on each side
+            const cells = Array.from(dl.children).map((c) => ({ c, r: c.getBoundingClientRect(), cs: getComputedStyle(c) }));
+            // Dividers span the whole block.
+            for (const { c, r, cs } of cells)
+              if (parseFloat(cs.borderBottomWidth) > 0 && Math.abs(r.width - inner) > 1) out.push(`${name}: divider under "${c.querySelector("dt")?.textContent}" is ${Math.round(r.width)} of ${Math.round(inner)} px`);
+            // Cells that share a row share a top.
+            for (const a of cells)
+              for (const b of cells)
+                if (a !== b && a.r.top < b.r.bottom - 1 && b.r.top < a.r.bottom - 1 && Math.abs(a.r.top - b.r.top) > 0.5)
+                  out.push(`${name}: "${a.c.querySelector("dt")?.textContent}" and "${b.c.querySelector("dt")?.textContent}" overlap but start at different heights`);
+            // From 700 px up, every row fills the width (no orphan cells).
+            if (width >= 700) {
+              const rows = new Map<number, number>();
+              for (const { r } of cells) rows.set(Math.round(r.top), (rows.get(Math.round(r.top)) ?? 0) + r.width);
+              for (const [top, w] of rows) if (Math.abs(w - inner) > 2) out.push(`${name}: the row at ${top} is ${Math.round(w)} of ${Math.round(inner)} px wide`);
+            }
+            return out;
+          },
+          { name, width },
+        )),
+      );
+    }
+    await ctx.close();
+    expect(problems).toEqual([]);
+  });
+}
+
 test("no horizontal overflow at 360 px", async ({ browser }) => {
   test.setTimeout(120_000);
   const ctx = await browser.newContext({ viewport: { width: 360, height: 800 }, reducedMotion: "reduce" });
