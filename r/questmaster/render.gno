@@ -274,7 +274,7 @@ func renderPaid(page int) string {
 	var b strings.Builder
 	b.WriteString("# Paid quests\n\n")
 	b.WriteString("[Board](" + pageURL("") + ")\n\n")
-	b.WriteString("Every quest below was paid by this realm to its builder: " + strconv.Itoa(paidIDs.Size()) + " quests, " + gnotStr(totalPaid) + " GNOT in total.\n\n")
+	b.WriteString("Every quest below was paid by this realm to its builder: " + plural(paidIDs.Size(), "quest") + ", " + gnotStr(totalPaid) + " GNOT in total.\n\n")
 	ids, nav := pageOf(&paidIDs, page, "paid")
 	if paidIDs.Size() == 0 {
 		b.WriteString("No quest has been paid yet.\n")
@@ -584,4 +584,12 @@ func capital(s string) string {
 		return s
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// plural returns "1 quest" or "N quests".
+func plural(n int, word string) string {
+	if n == 1 {
+		return "1 " + word
+	}
+	return strconv.Itoa(n) + " " + word + "s"
 }
