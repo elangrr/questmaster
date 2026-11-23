@@ -758,6 +758,44 @@ test("one wallet button per action list without a wallet", async ({ page }) => {
   await expect(page.locator(".action-body pre.cmd").first()).toContainText("-func 'ClaimQuest'");
 });
 
+// After a failed read nothing may keep loading: no skeleton left, no reserved empty line.
+async function errorPageChecks(page: Page, route: string, box: string) {
+  await page.addInitScript(() => {
+    (window as any).__cls = 0;
+    new PerformanceObserver((l) => {
+      for (const e of l.getEntries() as any[]) if (!e.hadRecentInput) (window as any).__cls += e.value;
+    }).observe({ type: "layout-shift", buffered: true });
+  });
+  await open(page, route);
+  await expect(page.locator(box)).toBeVisible();
+  await page.waitForTimeout(600);
+  await expect(page.locator("main .sk, main [aria-busy], main .skeleton-wrap")).toHaveCount(0);
+  await expect(page.locator("main p.totals")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__cls)).toBeLessThan(0.1);
+}
+
+test("board and quest page: nothing keeps loading when the realm is not live", async ({ page }) => {
+  await page.route("http://127.0.0.1:36657/", async (route) => {
+    const req = route.request().postDataJSON();
+    const base =
+      req?.params?.path === "vm/qpkgmeta_json"
+        ? { Data: btoa(JSON.stringify({ path: REALM, status: "inert", reason: "waiting for a package approver to enable it", pending: true })), Error: null, Log: "" }
+        : { Data: null, Error: { "@type": "/vm.InvalidPkgPathError" }, Log: "package not found" };
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { response: { ResponseBase: base } } }) });
+  });
+  await errorPageChecks(page, "/", ".state-box.waiting");
+  // The box follows the hero with normal section spacing: no leftover gap where the totals were.
+  const gap = await page.evaluate(() => document.querySelector(".state-box")!.getBoundingClientRect().top - document.querySelector(".hero")!.getBoundingClientRect().bottom);
+  expect(gap).toBeLessThanOrEqual(24);
+  await errorPageChecks(page, "/quest/4", ".state-box.waiting");
+});
+
+test("board and quest page: nothing keeps loading when the node fails", async ({ page }) => {
+  await page.route("http://127.0.0.1:36657/", (route) => route.fulfill({ status: 403, body: "forbidden" }));
+  await errorPageChecks(page, "/", ".state-box.error");
+  await errorPageChecks(page, "/quest/4", ".state-box.error");
+});
+
 test("no horizontal overflow at 360 px", async ({ browser }) => {
   test.setTimeout(120_000);
   const ctx = await browser.newContext({ viewport: { width: 360, height: 800 }, reducedMotion: "reduce" });

@@ -122,10 +122,13 @@ export function Board({ query }: { query: URLSearchParams }) {
         )}
       </section>
 
-      {/* One line of totals; its height is reserved while the board loads. */}
-      <p className="totals">
-        {data.status === "ready" ? <TotalsLine totals={data.value.totals} /> : <span className="sk sk-line" aria-hidden="true" />}
-      </p>
+      {/* One line of totals; its height is reserved while the board loads. If the board
+          cannot be read (error, not live) there is no totals line at all. */}
+      {data.status !== "error" && (
+        <p className="totals">
+          {data.status === "ready" ? <TotalsLine totals={data.value.totals} /> : <span className="sk sk-line" aria-hidden="true" />}
+        </p>
+      )}
 
       {data.status === "loading" && <SkeletonBoard />}
       {data.status === "error" && <ErrorBox error={data.error} onRetry={reload} />}
