@@ -2,7 +2,8 @@
 # QuestMaster: full flow on a LOCAL gnodev chain (chain id "dev").
 #
 # What it proves, on a real node (bank module, storage deposits, tx revert),
-# not under the test harness:
+# not under the test harness (stages 9 to 11: escaping of $ and leading g1
+# addresses in gnoweb's HTML, a two-message transaction, and the closing flow):
 #   1. post, claim, submit, approve: builder +reward, realm -reward
 #   2. post, cancel: the poster gets the reward back
 #   3. calls that must fail (poster claims own quest; coins sent to ClaimQuest)
@@ -271,6 +272,84 @@ d = body.find('id="details"')
 print("rendered details:", re.sub(r"\s+", " ", body[d:d + 900]))
 sys.exit(1 if bad else 0)
 PY
+stop
+
+# ---- stage 9: math ($...$) and a g1 address at the start of user text
+ADDR=g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5
+tx "$POSTER" PostQuest 1000000ugnot "$ADDR pays \$x\$" $'$$y$$ and $z$\n'"$ADDR"' line two' 1000 >>"$TXS"
+tx "$BUILDER" ClaimQuest "" 5 >>"$TXS"
+tx "$BUILDER" SubmitWork "" 5 'https://e.vil/$x$' >>"$TXS"
+tx "$POSTER" RejectWork "" 5 "$ADDR no \$\$m\$\$" >>"$TXS"
+run_stage s9-math
+page s9-math quest5 ":quest/5"
+python3 - "$OUT/page-s9-math-quest5.html" <<'PY'
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r'<md-renderer[^>]*id="main-content"[^>]*>(.*?)</md-renderer>', html, re.S)
+if not m:
+    print("FAIL rendered content not found in the page"); sys.exit(1)
+body = m.group(1)
+checks = {
+    "math rendered from user text": "<math" in body or "katex" in body.lower(),
+    "mention link to an address (/u/g1...)": "/u/g1" in body,
+    "title text missing": "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5 pays $x$" not in body,
+    "reason text missing": "no $$m$$" not in body,
+}
+for k, v in checks.items():
+    print(("FAIL " if v else "ok   ") + k)
+sys.exit(1 if any(checks.values()) else 0)
+PY
+stop
+
+# ---- stage 10: one transaction with TWO PostQuest messages and different
+#      sends. Each quest must store its own amount; the realm gets the sum.
+python3 - "$POSTER" >>"$TXS" <<'PY'
+import json, os, sys
+caller = sys.argv[1]
+def msg(title, send):
+    return {"@type": "/vm.m_call", "caller": caller, "send": send, "pkg_path": os.environ["REALM"],
+            "func": "PostQuest", "args": [title, "", "1000"]}
+print(json.dumps({"tx": {
+    "msg": [msg("Two in one tx: first", "2000000ugnot"), msg("Two in one tx: second", "3000000ugnot")],
+    "fee": {"gas_wanted": "50000000", "gas_fee": "50000ugnot"},
+    "signatures": [{"pub_key": {"@type": "/tm.PubKeySecp256k1", "value": "A+FhNtsXHjLfSJk1lB8FbiL4mGPjc50Kt81J7EKDnJ2y"}, "signature": ""}],
+    "memo": ""}}))
+PY
+run_stage s10-multimsg
+delta s9-math s10-multimsg
+python3 - <<'PY'
+import json, os, urllib.parse, urllib.request, base64, sys
+def q(data):
+    u = "http://127.0.0.1:36657/abci_query?path=%s&data=0x%s" % (urllib.parse.quote('"vm/qeval"'), data.encode().hex())
+    r = json.load(urllib.request.urlopen(u))["result"]["response"]["ResponseBase"]
+    return base64.b64decode(r["Data"]).decode() if r["Data"] else "ERROR " + str(r["Error"])
+realm = os.environ["REALM"]
+ok = True
+for qid, want in ((6, 2000000), (7, 3000000)):
+    out = q("%s.GetQuest(%d).Reward" % (realm, qid))
+    good = ("(%d int64)" % want) in out
+    ok = ok and good
+    print(("ok   " if good else "FAIL ") + "quest %d stores its own reward: %s" % (qid, out))
+sys.exit(0 if ok else 1)
+PY
+stop
+
+# ---- stage 11: closing. Post quest 8 (4 GNOT), builder claims, poster closes
+#      (no coins move), builder unclaims -> the quest ends and the poster is
+#      refunded on the node.
+tx "$POSTER" PostQuest 4000000ugnot "Closing flow" "" 1000 >>"$TXS"
+tx "$BUILDER" ClaimQuest "" 8 >>"$TXS"
+run_stage s11a-claimed
+stop
+tx "$POSTER" CancelQuest "" 8 >>"$TXS"
+run_stage s11b-closing
+delta s11a-claimed s11b-closing
+page s11b-closing quest8 ":quest/8"
+stop
+tx "$BUILDER" UnclaimQuest "" 8 >>"$TXS"
+run_stage s11c-refunded
+delta s11b-closing s11c-refunded
+page s11c-refunded quest8 ":quest/8"
 stop
 
 echo
