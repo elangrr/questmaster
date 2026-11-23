@@ -1,0 +1,97 @@
+{
+ "GetTotals()": {
+  "data": "(struct{(31 uint64),(25 int),(43234567 int64),(38234567 int64),(2500000 int64),(2500000 int64),(1 int)} gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.Totals)",
+  "error": null,
+  "log": ""
+ },
+ "GetQuest(1)": {
+  "data": "(struct{(1 uint64),(\"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5\" .uverse.address),(\"Translate the README to Indonesian\" string),(\"Keep the headings.\\nUse plain words.\" string),(2500000 int64),(4 gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow.State),(\"g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj\" .uverse.address),(\"https://github.com/example/questmaster/pull/7\" string),(20000 int64),(0 int64),(0 int64),(0 int64),(0 int64),(0 int64),(0 int),( string),(false bool),(false bool),(false bool)} gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.QuestView)",
+  "error": null,
+  "log": ""
+ },
+ "GetQuest(2)": {
+  "data": "(struct{(2 uint64),(\"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5\" .uverse.address),(\"Old idea\" string),(\"\" string),(1000000 int64),(5 gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow.State),( .uverse.address),( string),(20000 int64),(0 int64),(0 int64),(0 int64),(0 int64),(0 int64),(0 int),( string),(false bool),(false bool),(false bool)} gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.QuestView)",
+  "error": null,
+  "log": ""
+ },
+ "GetQuest(3)": {
+  "data": "(struct{(3 uint64),(\"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5\" .uverse.address),(\"Write a gnokey cheat sheet\" string),(\"One page, the ten most used commands.\" string),(3000000 int64),(2 gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow.State),(\"g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj\" .uverse.address),( string),(20000 int64),(0 int64),(0 int64),(0 int64),(20000 int64),(0 int64),(0 int),( string),(false bool),(false bool),(false bool)} gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.QuestView)",
+  "error": null,
+  "log": ""
+ },
+ "GetQuest(4)": {
+  "data": "(struct{(4 uint64),(\"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5\" .uverse.address),(\"Add a dark theme to the demo page\" string),(\"\" string),(5000000 int64),(3 gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow.State),(\"g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj\" .uverse.address),(\"https://github.com/example/questmaster/pull/9\" string),(20000 int64),(0 int64),(0 int64),(0 int64),(20000 int64),(172800 int64),(0 int),( string),(false bool),(false bool),(false bool)} gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.QuestView)",
+  "error": null,
+  "log": ""
+ },
+ "GetQuest(5)": {
+  "data": "(struct{(5 uint64),(\"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5\" .uverse.address),(\"Draw a logo\" string),(\"A small tavern sign.\" string),(2000000 int64),(2 gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow.State),(\"g1u7y667z64x2h7vc6fmpcprgey4ck233jaww9zq\" .uverse.address),( string),(20000 int64),(0 int64),(0 int64),(0 int64),(20000 int64),(0 int64),(0 int),( string),(true bool),(false bool),(false bool)} gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.QuestView)",
+  "error": null,
+  "log": ""
+ },
+ "GetQuest(6)": {
+  "data": "(struct{(6 uint64),(\"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5\" .uverse.address),(\"Record a short video\" string),(\"\" string),(1500000 int64),(5 gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow.State),(\"\" .uverse.address),(\"\" string),(20000 int64),(0 int64),(0 int64),(0 int64),(0 int64),(0 int64),(0 int),( string),(true bool),(false bool),(false bool)} gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.QuestView)",
+  "error": null,
+  "log": ""
+ },
+ "GetQuest(7)": {
+  "data": "(struct{(7 uint64),(\"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5\" .uverse.address),(\"He said \\\"hi\\\" \\\\o/ (a, b) {x} ünï 日本 <b>$x$</b> @alice\" string),(\"Line one with \\\"quotes\\\" and \\\\backslash\\\\\\n(struct{(\\\"fake\\\" string)} x) , } { ]\\n<script>alert(1)</script> [link](https://e.vil) ![i](https://e.vil/i.png)\\ng1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5 tabs\\there\" string),(1234567 int64),(1 gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow.State),(\"\" .uverse.address),(\"\" string),(20000 int64),(0 int64),(0 int64),(0 int64),(0 int64),(0 int64),(1 int),(\"Missing \\\"tests\\\"\\nand a \\\\ backslash, (paren) {brace}\" string),(false bool),(false bool),(false bool)} gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.QuestView)",
+  "error": null,
+  "log": ""
+ },
+ "GetQuest(8)": {
+  "data": "(struct{(8 uint64),(\"g1u7y667z64x2h7vc6fmpcprgey4ck233jaww9zq\" .uverse.address),(\"Small task 1\" string),(\"Details of small task 1.\" string),(1010000 int64),(1 gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow.State),( .uverse.address),( string),(1000 int64),(0 int64),(0 int64),(0 int64),(0 int64),(0 int64),(0 int),( string),(false bool),(false bool),(false bool)} gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster.QuestView)",
+  "error": null,
+  "log": ""
+ },
+ "GetQuest(999)": {
+  "data": "",
+  "error": {
+   "@type": "/abci.StringError",
+   "value": "questmaster: unknown quest id"
+  },
+  "log": "--= Error =--\nData: errors.FmtError{format:\"questmaster: unknown quest id\", args:[]interface {}(nil)}\nMsg Traces:\n    0  gno/tm2/pkg/errors/errors.go:103 - VM panic: questmaster: unknown quest id\nStacktrace:\npanic: questmaster: unknown quest id\nmustGet at gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster/questmaster.gno:401\nGetQuest at gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster/questmaster.gno:274\n\n\nStack Trace:\n    0  gno/tm2/pkg/errors/errors.go:88\n    1  gno/tm2/pkg/errors/errors.go:103\n    2  gno/gno.land/pkg/sdk/vm/keeper.go:1560\n    3  gno/gno.land/pkg/sdk/vm/keeper.go:1520\n    4  toolchain/runtime/panic.go:783\n... 29 more lines elided"
+ },
+ "OpenQuestIDs(0, 20)": {
+  "data": "(slice[(31 uint64),(30 uint64),(29 uint64),(28 uint64),(27 uint64),(26 uint64),(25 uint64),(24 uint64),(23 uint64),(22 uint64),(21 uint64),(20 uint64),(19 uint64),(18 uint64),(17 uint64),(16 uint64),(15 uint64),(14 uint64),(13 uint64),(12 uint64)] []uint64)",
+  "error": null,
+  "log": ""
+ },
+ "OpenQuestIDs(20, 20)": {
+  "data": "(slice[(11 uint64),(10 uint64),(9 uint64),(8 uint64),(7 uint64)] []uint64)",
+  "error": null,
+  "log": ""
+ },
+ "PaidQuestIDs(0, 20)": {
+  "data": "(slice[(1 uint64)] []uint64)",
+  "error": null,
+  "log": ""
+ },
+ "QuestIDsByBuilder(address(\"g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj\"), 0, 20)": {
+  "data": "(slice[(7 uint64),(6 uint64),(4 uint64),(3 uint64),(1 uint64)] []uint64)",
+  "error": null,
+  "log": ""
+ },
+ "QuestIDsByPoster(address(\"g1zzzz\"), 0, 20)": {
+  "data": "(slice[] []uint64)",
+  "error": null,
+  "log": ""
+ },
+ "CountByPoster(address(\"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5\"))": {
+  "data": "(7 int)",
+  "error": null,
+  "log": ""
+ },
+ "missing-realm GetTotals()": {
+  "data": "",
+  "error": {
+   "@type": "/vm.InvalidPkgPathError"
+  },
+  "log": "--= Error =--\nData: vm.InvalidPkgPathError{abciError:vm.abciError{}}\nMsg Traces:\n    0  gno/gno.land/pkg/sdk/vm/errors.go:89 - package not found: gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/nope\nStack Trace:\n    0  gno/tm2/pkg/errors/errors.go:93\n    1  gno/gno.land/pkg/sdk/vm/errors.go:89\n    2  gno/gno.land/pkg/sdk/vm/keeper.go:2005\n    3  gno/gno.land/pkg/sdk/vm/keeper.go:1950\n    4  gno/gno.land/pkg/sdk/vm/handler.go:309\n    5  gno/gno.land/pkg/sdk/vm/handler.go:154\n    6  gno/tm2/pkg/sdk/baseapp.go:641\n    7  gno/tm2/pkg/sdk/baseapp.go:473\n    8  gno/tm2/pkg/bft/abci/client/local_client.go:193\n    9  gno/tm2/pkg/bft/appconn/app_conn.go:144\n   10  gno/tm2/pkg/bft/rpc/core/abci.go:29\n... 15 more lines elided"
+ },
+ "qpkgmeta_json": {
+  "data": "{\"path\":\"gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster\",\"status\":\"live\",\"creator\":\"g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5\"}",
+  "error": null,
+  "log": ""
+ }
+}
