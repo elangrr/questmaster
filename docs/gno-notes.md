@@ -105,3 +105,45 @@ approximate time.
 premined, so a `PostQuest` call can be checked without creating or importing any key. gnodev keeps its
 built-in test1 key in `<-home>/data/keys.db`; `-home` defaults to `GNOHOME`, so keep that pointed at a
 throwaway folder.
+
+## gnoweb and Render (v1.8.0)
+
+- gnoweb calls `Render` with everything after `:` in the URL, query string included:
+  `/r/ns/questmaster:quest/3?page=2` gives `Render("quest/3?page=2")`, and `/r/ns/questmaster?page=2` gives
+  `Render("?page=2")` (`weburl.EncodeArgs`, `gno.land/pkg/gnoweb/weburl/url.go`). The realm splits off and
+  parses the query itself with `net/url`.
+- Transaction links: `/r/<path>$help&func=Fn&arg=value&.send=1000000ugnot` opens gnoweb's form for `Fn`
+  with arguments prefilled (GnoConnect, docs/resources/gnoconnect.md). The realm builds them with
+  `gno.land/p/moul/txlink/v0` (`txlink.Realm(path).NewLink(fn).AddArgs(...).SetSend(...)`). For `.send`,
+  gnoweb shows a warning with the amount and the user must switch on "add coins" before signing. The
+  amount comes from the link, so the pages offer 1, 5 and 10 GNOT links. Checked on gnodev's gnoweb.
+- Escaping: `gno.land/p/nt/markdown/sanitize/v0` (InlineText, TableCell, URL, ...) is the sanitizer that
+  gnoweb's own markdown tests use (`gno.land/pkg/gnoweb/markdown/SANITIZE.md`). It is deployed on Onyx and
+  mainnet. Two gaps for this realm: `Blockquote`/`Block` keep inline links and images, so multi-line text
+  is escaped line by line with `TableCell` instead; and gnoweb's mention parser turns `@name` and ` g1…`
+  (an address after a space) into profile links, which the sanitizer does not stop, so `@` becomes `\@` and
+  the space before `g1` becomes `&#32;`. Both are checked in the realm tests and on the real gnoweb.
+- `unsafe.CurrentRealm()` inside `Render` depends on the caller's frame: called from a test it returned an
+  empty path. The realm captures its package path once in `init()` instead. On gnodev the links came out
+  right.
+- gnoweb serves the raw Markdown of a page with the request header `Accept: text/markdown`.
+
+## Storage deposit (measured on gnodev, default price 100 ugnot per byte)
+
+- Every call that grows a realm's stored data locks a deposit from the caller; it goes to the address
+  derived from `pkgPath:<realm path>.storageDeposit` (`gno.DeriveStorageDepositCryptoAddr`), not to the
+  realm's own address. So the realm's balance holds only escrowed rewards.
+- When a call makes the stored data smaller, the freed share goes back to that caller. On a network where
+  `ugnot` transfers are restricted (`bank:p:restricted_denoms`), it goes to the storage fee collector
+  instead (`gno.land/pkg/sdk/vm/keeper.go`, `processStorageDeposit`).
+- Measured per call on the local flow: posting a quest about 0.65 GNOT (647,600 ugnot), approve 102,800,
+  claim about 0.29 GNOT; cancelling returned 97,800 to the poster. The cap per call is `-max-deposit`
+  (default 100 GNOT on the chain).
+- Gas: one PostQuest used about 2.1M VM gas in a filetest; the example commands use `-gas-wanted 50000000`.
+
+## Local flow on gnodev without keys
+
+`scripts/local-flow.sh` boots gnodev with a file of genesis transactions (`-txs-file`). Genesis
+transactions go through the same `Deliver` path as normal ones (bank, storage deposit, revert on error)
+but need no signature, only the caller's public key, so no key is created or used. Each stage reboots
+with the transactions so far and reads balances, totals, storage and pages.
