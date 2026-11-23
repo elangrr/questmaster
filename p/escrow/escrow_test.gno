@@ -15,7 +15,7 @@ var (
 
 const (
 	reward     int64 = 5_000_000
-	workBlocks int64 = 200
+	workBlocks int64 = 2_000
 	h0         int64 = 1000 // post height
 )
 
@@ -128,6 +128,14 @@ func TestPostInvalid(t *testing.T) {
 		{"title too long", poster, long(MaxTitleLen + 1), "", reward, workBlocks, h0, ErrTitleTooLong},
 		{"details too long", poster, "t", long(MaxDetailsLen + 1), reward, workBlocks, h0, ErrDetailsTooLong},
 		{"invalid utf8", poster, "t\xff", "", reward, workBlocks, h0, ErrInvalidText},
+		{"title newline", poster, "a\nb", "", reward, workBlocks, h0, ErrTitleControlChar},
+		{"title tab", poster, "a\tb", "", reward, workBlocks, h0, ErrTitleControlChar},
+		{"title CR", poster, "a\rb", "", reward, workBlocks, h0, ErrTitleControlChar},
+		{"title NUL", poster, "a\x00b", "", reward, workBlocks, h0, ErrTitleControlChar},
+		{"title DEL", poster, "a\x7fb", "", reward, workBlocks, h0, ErrTitleControlChar},
+		{"title C1 NEL", poster, "a\u0085b", "", reward, workBlocks, h0, ErrTitleControlChar},
+		{"title line separator", poster, "a\u2028b", "", reward, workBlocks, h0, ErrTitleControlChar},
+		{"title paragraph separator", poster, "a\u2029b", "", reward, workBlocks, h0, ErrTitleControlChar},
 		{"work too low", poster, "t", "", reward, MinWorkBlocks - 1, h0, ErrWorkBlocksTooLow},
 		{"work too high", poster, "t", "", reward, MaxWorkBlocks + 1, h0, ErrWorkBlocksTooHigh},
 	}
@@ -139,6 +147,22 @@ func TestPostInvalid(t *testing.T) {
 		if err != nil && q != nil {
 			t.Errorf("%s: quest returned with error", c.name)
 		}
+	}
+}
+
+// Titles may hold ordinary punctuation and non-ASCII letters; details and
+// reject reasons may keep newlines (the realm's Render escapes them).
+func TestTextAllowed(t *testing.T) {
+	_, err := NewQuest(1, poster, "Fix | table [link](x) — ünïcode 日本", "line 1\nline 2\ttab", reward, workBlocks, h0)
+	mustOK(t, err, "title punctuation, details with newline")
+	q := newSubmitted(t)
+	mustOK(t, q.Reject(poster, "first line\nsecond line", h0+30), "reason with newline")
+}
+
+// The window constants are pinned so a change is a deliberate, reviewed edit.
+func TestWindowConstants(t *testing.T) {
+	if MinWorkBlocks != 1_000 || MaxWorkBlocks != 2_200_000 || ReviewBlocks != 75_000 {
+		t.Fatalf("window constants changed: min %d max %d review %d", MinWorkBlocks, MaxWorkBlocks, ReviewBlocks)
 	}
 }
 

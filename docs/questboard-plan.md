@@ -1,7 +1,6 @@
 # Questboard: build plan for the Gnome Tavern hackathon
 
 Deadline: 18 Dec 2026, 01:00 UTC (08:00 WIB). Target finish: 15 Dec.
-Related files in this folder: gnome-tavern-brief.md (hackathon rules), idea-questboard.md (the idea).
 
 ## 1. Goal
 

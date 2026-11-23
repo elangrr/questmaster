@@ -36,6 +36,7 @@ package escrow
 import (
 	"errors"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -46,14 +47,19 @@ const (
 	MaxLinkLen    = 300
 	MaxReasonLen  = 300
 
-	// MinWorkBlocks and MaxWorkBlocks bound the work window a poster may set.
-	MinWorkBlocks int64 = 100
-	MaxWorkBlocks int64 = 1_000_000
+	// Windows are in blocks. Measured block time on 2026-11-23 was about
+	// 3.4 s (Onyx) to 3.5 s (mainnet); the values below assume 3.5 s.
+	// See docs/gno-notes.md for the maths.
 
-	// ReviewBlocks is the fixed review window every quest gets after Submit.
-	// If the poster neither approves nor rejects within it, the builder may
-	// call ClaimPayout.
-	ReviewBlocks int64 = 50_000
+	// MinWorkBlocks and MaxWorkBlocks bound the work window a poster may set:
+	// about 1 hour and about 90 days.
+	MinWorkBlocks int64 = 1_000
+	MaxWorkBlocks int64 = 2_200_000
+
+	// ReviewBlocks is the fixed review window every quest gets after Submit,
+	// about 3 days. If the poster neither approves nor rejects within it, the
+	// builder may call ClaimPayout.
+	ReviewBlocks int64 = 75_000
 )
 
 // State is the stage a quest is in.
@@ -131,6 +137,7 @@ var (
 	ErrInvalidHeight     = errors.New("escrow: invalid block height")
 	ErrTitleEmpty        = errors.New("escrow: title is empty")
 	ErrTitleTooLong      = errors.New("escrow: title is too long")
+	ErrTitleControlChar  = errors.New("escrow: title must not contain control characters such as newlines or tabs")
 	ErrDetailsTooLong    = errors.New("escrow: details are too long")
 	ErrWorkBlocksTooLow  = errors.New("escrow: work window is below the minimum")
 	ErrWorkBlocksTooHigh = errors.New("escrow: work window is above the maximum")
@@ -409,7 +416,10 @@ func (q *Quest) HoldsFunds() bool {
 
 // Validators. They are exported so a realm can check input early.
 
-// ValidateTitle checks a quest title: not blank, at most MaxTitleLen characters.
+// ValidateTitle checks a quest title: not blank, at most MaxTitleLen
+// characters, and no control characters (newline, tab, etc.) or Unicode line
+// and paragraph separators, because titles are shown inside Markdown tables
+// and links.
 func ValidateTitle(s string) error {
 	if !utf8.ValidString(s) {
 		return ErrInvalidText
@@ -419,6 +429,11 @@ func ValidateTitle(s string) error {
 	}
 	if utf8.RuneCountInString(s) > MaxTitleLen {
 		return ErrTitleTooLong
+	}
+	for _, r := range s {
+		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
+			return ErrTitleControlChar
+		}
 	}
 	return nil
 }
