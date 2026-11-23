@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { HOSTILE_DETAILS, HOSTILE_REASON, HOSTILE_TITLE } from "./hostile.mjs";
 
 const APP = process.env.QM_APP_URL!;
@@ -8,6 +8,15 @@ const POSTER = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const BUILDER = "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj";
 
 const open = (page: Page, route: string) => page.goto(`${APP}#${route}`);
+
+// The one third-party request (the GNOT price) never reaches the internet in
+// tests: it is answered here with a fixed price unless a test says otherwise.
+const PRICE_HOST = "https://api.coingecko.com/";
+const mockPrice = (ctx: BrowserContext, usd = 0.05) =>
+  ctx.route(`${PRICE_HOST}**`, (route) => route.fulfill({ contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ "gno-land": { usd } }) }));
+test.beforeEach(async ({ context }) => {
+  await mockPrice(context);
+});
 
 test("served from a sub-path; header, network label and footer", async ({ page }) => {
   await open(page, "/");
@@ -59,7 +68,7 @@ test("hostile text stays text everywhere", async ({ page }) => {
 test("every state shows the right facts and next steps", async ({ page }) => {
   await open(page, "/quest/1");
   await expect(page.locator(".badge")).toHaveText("Paid");
-  await expect(page.locator("main")).toContainText("Nothing: this quest is finished and the builder was paid 2.5 GNOT.");
+  await expect(page.locator("main")).toContainText("Nothing: this quest is finished and the builder was paid 2.5 GNOT · ≈ $0.13");
 
   await open(page, "/quest/2");
   await expect(page.locator(".badge")).toHaveText("Cancelled");
@@ -160,7 +169,12 @@ test("with a mocked Adena: connect, wrong network, claim sends the exact message
       GetAccount: async () => ok("GET_ACCOUNT", { address: builder, chainId }),
       SwitchNetwork: async (id: string) => (calls.push(["SwitchNetwork", id]), (chainId = id), ok("SWITCH_NETWORK_SUCCESS", { chainId: id })),
       AddNetwork: async (n: any) => (calls.push(["AddNetwork", n]), ok("ADD_NETWORK_SUCCESS")),
-      DoContract: async (p: any) => (calls.push(["DoContract", p]), ok("TRANSACTION_SENT", { hash: "ABC123hash=", height: "5" })),
+      // Holds until the test calls __approve(), like a person reading the Adena popup.
+      DoContract: (p: any) =>
+        new Promise((resolve) => {
+          calls.push(["DoContract", p]);
+          (window as any).__approve = () => resolve(ok("TRANSACTION_SENT", { hash: "ABC123hash=", height: "1" }));
+        }),
       On: () => true,
     };
   }, [BUILDER]);
@@ -174,7 +188,11 @@ test("with a mocked Adena: connect, wrong network, claim sends the exact message
   await expect(page.locator(".wallet-addr")).toHaveText("g1us8428…njlj");
   await claim.getByRole("button", { name: "Do this" }).click();
   await claim.getByRole("button", { name: "Take this quest" }).click();
+  await expect(claim.locator(".txstep")).toHaveText(["Waiting for your wallet", "2Sent", "3Confirmed"]);
+  await expect(claim.locator(".txstep.active")).toHaveCount(1);
+  await page.evaluate(() => (window as any).__approve());
   await expect(page.locator(".ok")).toContainText("Sent: Take this quest. Transaction");
+  await expect(page.locator(".ok")).toContainText("confirmed in block 1.");
   await expect(page.locator(".ok a")).toHaveAttribute("href", "https://gnoscan.io/transactions/details?txhash=ABC123hash%3D&chainId=dev");
   const calls = await page.evaluate(() => (window as any).__calls);
   expect(calls.find((c: any) => c[0] === "DoContract")[1]).toEqual({
@@ -190,6 +208,152 @@ test("a node that refuses queries (HTTP 403) gets a clear message", async ({ pag
   await expect(page.locator(".state-box.error")).toContainText("does not allow these read queries (HTTP 403)");
 });
 
+test("dollar hint: shown next to GNOT, live in the post form, never in a transaction", async ({ page, context }) => {
+  const seen: { url: string; referer?: string; cookie?: string }[] = [];
+  const hosts = new Set<string>();
+  page.on("request", (r) => {
+    hosts.add(new URL(r.url()).origin);
+    if (r.url().startsWith(PRICE_HOST)) seen.push({ url: r.url(), referer: r.headers()["referer"], cookie: r.headers()["cookie"] });
+  });
+  await context.unroute(`${PRICE_HOST}**`);
+  await mockPrice(context, 0.124);
+  await open(page, "/");
+  const stats = page.locator(".stats");
+  await expect(stats).toContainText("38.234567GNOT locked≈ $4.74"); // 38.234567 × 0.124
+  await expect(page.locator("table.quests tbody tr").first().locator("[data-usd]")).toHaveText(/^≈ \$\d+\.\d\d/);
+  await expect(page.locator("[data-usd]").first()).toHaveAttribute("title", /mainnet GNOT price \(\$0\.124 per GNOT, CoinGecko, fetched .+\)\. Test GNOT has no real value\./);
+  await expect(page.locator("footer [data-price-note]")).toContainText("Dollar figures are approximate");
+
+  await open(page, "/post");
+  await page.getByLabel("Reward (GNOT)").fill("5");
+  const cost = page.locator(".cost");
+  await expect(cost).toContainText("The reward: 5 GNOT · ≈ $0.62");
+  await page.getByLabel("Reward (GNOT)").fill("12.5");
+  await expect(cost).toContainText("12.5 GNOT · ≈ $1.55");
+  await page.locator("summary", { hasText: "No Adena?" }).click();
+  await expect(page.locator("pre.cmd")).toContainText("-send '12500000ugnot'"); // exact ugnot, no dollar maths
+
+  // One price request for the whole visit (cached), with no address, cookie or referrer.
+  expect(seen).toHaveLength(1);
+  expect(seen[0].url).toBe("https://api.coingecko.com/api/v3/simple/price?ids=gno-land&vs_currencies=usd");
+  expect(seen[0].referer).toBeUndefined();
+  expect(seen[0].cookie).toBeUndefined();
+  // Nothing else leaves the page except chain queries.
+  const appOrigin = new URL(APP).origin;
+  expect([...hosts].filter((h) => h !== appOrigin && h !== "http://127.0.0.1:36657" && h !== "https://api.coingecko.com")).toEqual([]);
+});
+
+for (const [name, handler] of [
+  ["fails", (route: any) => route.abort("failed")],
+  ["times out", () => new Promise(() => {})],
+  ["returns a server error", (route: any) => route.fulfill({ status: 429, body: "rate limited" })],
+] as const) {
+  test(`dollar hint: hidden, without errors, when the price request ${name}`, async ({ page, context }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await context.unroute(`${PRICE_HOST}**`);
+    await context.route(`${PRICE_HOST}**`, handler as any);
+    await open(page, "/");
+    await expect(page.locator(".stats")).toContainText("38.234567GNOT locked");
+    await expect(page.locator("table.quests tbody tr")).toHaveCount(20); // the board renders regardless
+    await page.waitForTimeout(4200); // past the 3.5 s timeout
+    await expect(page.locator("[data-usd]")).toHaveCount(0);
+    await expect(page.locator("footer [data-price-note]")).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+}
+
+test("reduced motion: no animation keeps running anywhere", async ({ browser }) => {
+  const ctx = await browser.newContext({ reducedMotion: "reduce" });
+  await mockPrice(ctx);
+  const page = await ctx.newPage();
+  for (const route of ["/", "/quest/4", "/how", "/post", "/agents"]) {
+    await page.goto(`${APP}#${route}`);
+    await page.locator("main h1").first().waitFor();
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(300);
+    const running = await page.evaluate(() =>
+      document.getAnimations().filter((a) => a.playState === "running").map((a) => (a as CSSAnimation).animationName ?? "?"),
+    );
+    expect(running, `running animations on ${route}`).toEqual([]);
+  }
+  // Without reduced motion the hero diagram does animate (so the check above means something).
+  const ctx2 = await browser.newContext();
+  await mockPrice(ctx2);
+  const p2 = await ctx2.newPage();
+  await p2.goto(`${APP}#/`);
+  await p2.locator("[data-testid=quest-flow]").waitFor();
+  expect(await p2.evaluate(() => document.getAnimations().filter((a) => a.playState === "running").length)).toBeGreaterThan(0);
+  await ctx.close();
+  await ctx2.close();
+});
+
+test("hero diagram causes no layout shift while the board loads", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as any).__shifts = [];
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries() as any[]) {
+        if (e.hadRecentInput) continue;
+        (window as any).__shifts.push({ value: e.value, sources: (e.sources ?? []).map((s: any) => s.node?.className?.baseVal ?? s.node?.className ?? s.node?.nodeName ?? "") });
+      }
+    }).observe({ type: "layout-shift", buffered: true });
+  });
+  await open(page, "/");
+  const hero = page.locator(".hero-visual");
+  await hero.waitFor();
+  // Layout box (offset*), not the painted box: the one-time entrance transform is not a shift.
+  const box = () => hero.evaluate((el: HTMLElement) => ({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }));
+  const before = await box();
+  await expect(page.locator("table.quests tbody tr")).toHaveCount(20);
+  await page.waitForTimeout(1200); // count-ups and the price hint have settled
+  expect(await box()).toEqual(before);
+  const shifts = await page.evaluate(() => (window as any).__shifts as { value: number; sources: string[] }[]);
+  const heroShifts = shifts.filter((s) => s.sources.some((c) => /hero|flow/.test(String(c))));
+  expect(heroShifts).toEqual([]);
+  const cls = shifts.reduce((a, s) => a + s.value, 0);
+  expect(cls).toBeLessThan(0.1); // "good" CLS for the whole page
+  console.log(`board CLS ${cls.toFixed(4)} from ${shifts.length} shifts`);
+});
+
+test("AI agents page: config and prompts with copy buttons", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await open(page, "/agents");
+  await expect(page.locator("main h1")).toHaveText("For AI agents");
+  await expect(page.locator("pre.cmd").first()).toHaveText("claude mcp add gnomcp --scope user -- ~/.local/bin/gnomcp");
+  await expect(page.locator("pre.cmd").nth(1)).toContainText('"gnomcp": { "command": "gnomcp", "args": [] }');
+  await expect(page.locator(".prompt")).toHaveCount(3);
+  await expect(page.locator(".prompt").first()).toContainText(REALM);
+  await page.getByRole("button", { name: "Copy: prompt 1" }).click();
+  await expect(page.getByRole("button", { name: "Copied: prompt 1" })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(`render ${REALM}`);
+  await expect(page.getByRole("link", { name: "AI agents" })).toHaveAttribute("aria-current", "page");
+});
+
+test("share card, canonical URL and favicon", async ({ page, request }) => {
+  await open(page, "/");
+  const meta = (sel: string) => page.locator(sel).getAttribute("content");
+  expect(await page.locator('link[rel="canonical"]').getAttribute("href")).toBe("https://elangrr.github.io/questmaster/");
+  expect(await meta('meta[property="og:url"]')).toBe("https://elangrr.github.io/questmaster/");
+  expect(await meta('meta[property="og:image"]')).toBe("https://elangrr.github.io/questmaster/og.png");
+  expect(await meta('meta[name="twitter:card"]')).toBe("summary_large_image");
+  const icon = await page.locator('link[rel="icon"]').getAttribute("href");
+  expect((await request.get(new URL(icon!, APP).href)).headers()["content-type"]).toContain("svg");
+  const og = await request.get(new URL("og.png", APP).href);
+  expect(og.status()).toBe(200);
+});
+
+test("quest page: stepper, deadline bar, reject count", async ({ page }) => {
+  await open(page, "/quest/4");
+  await expect(page.locator(".stepper .step")).toHaveCount(4);
+  await expect(page.locator('.stepper [aria-current="step"]')).toContainText("Submitted");
+  const bar = page.locator(".deadline [role=progressbar]");
+  await expect(bar).toHaveAttribute("aria-label", /^Review deadline: about .+ left$/);
+  await open(page, "/quest/7");
+  await expect(page.locator(".reject-count")).toHaveText("Rejected 1 time");
+  await open(page, "/quest/2");
+  await expect(page.locator(".stepper .step.exit")).toContainText("Refunded");
+});
+
 test("keyboard: skip link and focusable controls", async ({ page }) => {
   await open(page, "/");
   await page.keyboard.press("Tab");
@@ -201,11 +365,24 @@ for (const scheme of ["light", "dark"] as const) {
   for (const [name, size] of [["desktop", { width: 1280, height: 900 }], ["phone", { width: 390, height: 844 }]] as const) {
     test(`screenshots ${name} ${scheme}`, async ({ browser }) => {
       const ctx = await browser.newContext({ viewport: size, colorScheme: scheme, deviceScaleFactor: name === "phone" ? 2 : 1 });
+      await mockPrice(ctx);
       const page = await ctx.newPage();
-      for (const [route, file] of [["/", "board"], ["/quest/4", "quest-submitted"], ["/quest/7", "quest-hostile"], ["/post", "post"]] as const) {
+      for (const [route, file] of [
+        ["/", "board"],
+        ["/quest/31", "quest-open"],
+        ["/quest/3", "quest-claimed"],
+        ["/quest/4", "quest-submitted"],
+        ["/quest/5", "quest-closing"],
+        ["/quest/1", "quest-paid"],
+        ["/quest/7", "quest-hostile"],
+        ["/post", "post"],
+        ["/how", "how"],
+        ["/agents", "agents"],
+      ] as const) {
         await page.goto(`${APP}#${route}`);
         await page.locator("main h1").first().waitFor();
         await page.waitForLoadState("networkidle");
+        await page.waitForTimeout(1000); // entrance and count-up finished
         await page.screenshot({ path: `${SHOTS}/${file}-${name}-${scheme}.png`, fullPage: true });
       }
       await ctx.close();

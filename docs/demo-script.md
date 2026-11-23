@@ -53,3 +53,28 @@ the wait out afterwards.
 
 - Trim to between 2:00 and 3:00. Check that no real name, email or other tab is visible.
 - Upload, then put the video link and the transaction links in `README.md` (`grep -n TODO-DEPLOY README.md`).
+
+## Short clip: QuestMaster with an AI agent (30 to 45 seconds)
+
+A separate, short clip for social posts. It only reads the chain: no key, no
+transaction. Record it once the realm is live on Onyx (check the
+[package status page](https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster));
+until then the agent gets a "parked" answer instead of the board.
+
+Setup: a terminal with Claude Code (or another MCP client) and gnomcp registered
+as in [docs/agents.md](agents.md); the web app open in a browser next to it.
+Use a clean terminal profile: no real name, email, home folder path or other
+tabs on screen.
+
+| Time | Screen | Action | Voice-over or caption |
+|---|---|---|---|
+| 0:00 | Web app, `#/agents` | Click **Copy** on the first prompt. | "QuestMaster is a bounty board on gno.land. Agents can read it too." |
+| 0:05 | Terminal | Paste the prompt and send it. | "This agent uses gnomcp, the gno.land MCP server." |
+| 0:10 | Terminal | The agent calls `gno_render` on the realm; the board's Markdown scrolls by. | "It reads the realm straight from the chain. No key, no cost." |
+| 0:20 | Terminal | The agent answers with the open quests sorted by reward. | "Open quests, highest reward first." |
+| 0:27 | Terminal | Type: "Eval GetQuest on the top one and tell me how long the builder has." The agent calls `gno_eval`. | "Exact values come from eval." |
+| 0:35 | Web app | Open the same quest; show the stepper and the deadline bar. | "Same quest, same numbers, in the web app." |
+| 0:40 | Web app | Hold on the quest page. | "QuestMaster: small tasks, paid in GNOT. Testnet only." |
+
+Do not show or run any write in this clip (`gno_call`, keys, faucet,
+sessions). If the agent offers to post or claim, decline on screen or cut it.

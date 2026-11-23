@@ -9,6 +9,10 @@ form.
 
 It targets the **Onyx test network (`onyx-1`) with test GNOT only**.
 
+**The app asks CoinGecko for the GNOT price; nothing else leaves the page
+except chain queries.** See [Dollar hint](#dollar-hint) for exactly what is
+sent and how to turn it off.
+
 ## Run it
 
 Needs Node 22 and npm 10.
@@ -22,7 +26,7 @@ npm run dev       # http://localhost:5173, talking to Onyx
 ## Test it
 
 ```sh
-npm test          # unit tests (Vitest): decoder, amounts, time, validation, wallet messages
+npm test          # unit tests (Vitest): decoder, amounts, time, validation, wallet messages, dollar hint
 npm run typecheck
 npm run e2e       # end-to-end, against a LOCAL gnodev chain (see below)
 ```
@@ -37,7 +41,18 @@ npm run e2e       # end-to-end, against a LOCAL gnodev chain (see below)
 2. builds the app for that chain and serves it under `/questmaster/`, the
    way GitHub Pages would;
 3. runs `e2e/app.spec.ts` in headless Chromium (Playwright) and saves
-   screenshots to `e2e/out/screenshots/`.
+   screenshots to `e2e/out/screenshots/`. The GNOT price request is answered
+   inside the test, never sent to CoinGecko. Checks include: no animation
+   left running under `prefers-reduced-motion`, no layout shift from the hero
+   diagram, and the three transaction steps with a mocked Adena.
+
+Videos and Lighthouse numbers (phone profile) for reviews come from
+`e2e/media.spec.ts`, which runs only when given an output folder:
+`QM_MEDIA=<folder> node e2e/run-e2e.mjs e2e/media.spec.ts`. It fetches
+Lighthouse with `npx`; Lighthouse is not a dependency.
+
+The share-card image `public/og.png` is rendered from
+`scripts/og-image.html` with `node scripts/og-image.mjs`.
 
 First time only: `npx playwright install chromium` (downloads a browser into
 `~/.cache/ms-playwright`).
@@ -95,6 +110,51 @@ VITE_GNOWEB_URL=http://127.0.0.1:8888
 | `VITE_EXPLORER_ACCOUNT_URL` | GnoScan, `{address}` placeholder | account link |
 | `VITE_SOURCE_URL` | the GitHub repo | footer link |
 | `VITE_PKG_STATUS_URL` | `https://gpas.onyx.testnets.gno.land/?path={path}` | official package-approval status, linked while the realm is not live |
+| `VITE_GNOT_USD_SOURCE` | `coingecko` | where the dollar hint gets the GNOT price; `off` sends no request and shows no dollar figures |
+| `VITE_GNOT_USD` | empty | a GNOT price in US dollars set by hand (for example `0.05`); when set, nothing is fetched |
+
+## Dollar hint
+
+Next to each GNOT amount the app shows roughly what it is worth in US
+dollars, for example `5 GNOT · ≈ $0.25`. GNOT stays the main number; the
+dollar figure is smaller and muted. On Onyx this is **test GNOT with no
+value**: the figure is what the same number of mainnet GNOT would be worth at
+the current market price, and the tooltip and the footer say so, with the
+price used and when it was fetched.
+
+- **Source:** CoinGecko's keyless public API, coin id `gno-land` (Gno.land's
+  GNOT, home page gno.land; traded on Kraken and KuCoin). The one request is
+  `GET https://api.coingecko.com/api/v3/simple/price?ids=gno-land&vs_currencies=usd`.
+  CoinGecko answers with CORS `*`.
+- **What is sent:** that URL only. No cookies (`credentials: "omit"`), no
+  referrer (`referrerPolicy: "no-referrer"`), nothing about the user, their
+  wallet or their address.
+- **When:** after the page has rendered, never blocking it. It gives up after
+  3.5 seconds. The price is cached in memory and in `localStorage` for
+  5 minutes, so browsing the app makes at most one request per 5 minutes.
+- **Failure:** any error, timeout, rate limit or odd reply hides the dollar
+  figures quietly. A reply that is not a sane price for `gno-land` is ignored.
+- **Never used for transactions:** amounts sent are always the exact ugnot
+  typed; the dollar figure is display only (`src/lib/price.ts`).
+- **Turn it off:** build with `VITE_GNOT_USD_SOURCE=off`, or set
+  `VITE_GNOT_USD` to fix the price by hand.
+
+## Design and motion
+
+Colours, type sizes, spacing and motion timings are tokens at the top of
+`src/styles.css`, with a light ("parchment") and a dark theme. Headings use the
+system serif stack, body text the system sans; no web fonts are downloaded.
+Visuals are inline SVG in `src/ui/visuals.tsx` (the mark, the quest-flow
+diagram, the quest stepper, deadline bars, skeletons, small illustrations);
+motion helpers are in `src/ui/motion.ts`. There is no animation library.
+
+- Under `prefers-reduced-motion: reduce` every animation and transition
+  settles at once: the diagram is shown in its final state and totals appear
+  without counting.
+- The hero diagram loops quietly and pauses when it is off-screen or the tab
+  is hidden.
+- Loaders are skeletons the same size as what replaces them, so content does
+  not jump.
 
 ## How it reads the chain
 

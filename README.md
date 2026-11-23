@@ -20,6 +20,11 @@ A friendlier front door than gnoweb: browse the board, read quests, and post, ta
 
 - Web app: https://elangrr.github.io/questmaster/
 - Code, tests and hosting notes: [`web/`](web/README.md); a hands-on checklist with Adena: [`web/TESTING.md`](web/TESTING.md).
+- Next to each GNOT amount the app shows a small, approximate US-dollar value at the current mainnet GNOT price (from CoinGecko). Test GNOT has no real value; the dollar figure is display only and never used in a transaction.
+
+### For AI agents
+
+Agents can read the board through [gnomcp](https://github.com/gnoverse/gno-mcp), the gno.land MCP server: render the realm and eval its read functions, with no key. [`docs/agents.md`](docs/agents.md) has the setup, the exact calls, what a write would need, and which calls were verified on Onyx and on a local gnodev. The web app has the same config and example prompts at [`#/agents`](https://elangrr.github.io/questmaster/#/agents).
 
 ## A one-minute tour
 
@@ -353,7 +358,7 @@ docs/examples/bounty/     the README's escrow example, compiled and tested
 scripts/local-flow.sh     full flow on a local node
 scripts/set-namespace.sh  replace the placeholder namespace before deploying
 web/                      the web app (static site, Adena wallet)
-docs/                     plan, deployment steps, demo script, Gno notes
+docs/                     plan, deployment steps, demo script, Gno notes, AI-agent guide
 LICENSE, NOTICE            Apache License 2.0 for QuestMaster's own code; third-party notice
 ```
 

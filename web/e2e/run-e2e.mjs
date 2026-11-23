@@ -6,6 +6,7 @@
 // Needs gno v1.8.0's gnodev on PATH. Uses a throwaway GNOHOME; no keys.
 import { spawn, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
+import { gzipSync } from "node:zlib";
 import { readFileSync, existsSync, mkdtempSync, writeFileSync, statSync, rmSync, mkdirSync } from "node:fs";
 import { join, extname, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -83,7 +84,7 @@ execFileSync("npx", ["vite", "build", "--outDir", "e2e/out/dist", "--emptyOutDir
   },
 });
 const dist = join(web, "e2e/out/dist");
-const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".json": "application/json" };
+const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".json": "application/json", ".png": "image/png" };
 server = createServer((req, res) => {
   const url = new URL(req.url, "http://x");
   if (!url.pathname.startsWith("/questmaster/")) {
@@ -92,7 +93,13 @@ server = createServer((req, res) => {
   }
   let p = join(dist, decodeURIComponent(url.pathname.slice("/questmaster/".length)) || "index.html");
   if (!p.startsWith(dist) || !existsSync(p) || statSync(p).isDirectory()) p = join(dist, "index.html");
-  res.writeHead(200, { "Content-Type": types[extname(p)] ?? "application/octet-stream" }).end(readFileSync(p));
+  const type = types[extname(p)] ?? "application/octet-stream";
+  // gzip text like GitHub Pages does, so Lighthouse numbers are comparable.
+  if (/^(text\/|image\/svg|application\/json)/.test(type) && /\bgzip\b/.test(req.headers["accept-encoding"] ?? "")) {
+    res.writeHead(200, { "Content-Type": type, "Content-Encoding": "gzip", Vary: "Accept-Encoding" }).end(gzipSync(readFileSync(p)));
+    return;
+  }
+  res.writeHead(200, { "Content-Type": type }).end(readFileSync(p));
 }).listen(APP_PORT, "127.0.0.1");
 console.log(`app served at http://127.0.0.1:${APP_PORT}/questmaster/`);
 

@@ -1,8 +1,10 @@
 import { config, gnowebPage } from "../config";
 import { shortAddr } from "../lib/format";
 import { useRoute, useTheme, type Theme } from "./hooks";
-import { AddressPage, Board, How, Mine, Paid, Post, QuestPage } from "./pages";
+import { Agents, AddressPage, Board, How, Mine, Paid, Post, QuestPage } from "./pages";
 import { Empty } from "./parts";
+import { PriceFootnote } from "./price";
+import { Mark } from "./visuals";
 import { useWallet, WalletProvider } from "./WalletContext";
 
 function parse(route: string): { path: string; query: URLSearchParams } {
@@ -17,6 +19,7 @@ function Routes() {
   if (path === "/paid") return <Paid query={query} />;
   if (path === "/post") return <Post />;
   if (path === "/how") return <How />;
+  if (path === "/agents") return <Agents />;
   if (path === "/mine") return <Mine />;
   if ((m = /^\/quest\/([^/]+)$/.exec(path))) return <QuestPage id={m[1]} />;
   if ((m = /^\/address\/([^/]*)$/.exec(path))) return <AddressPage address={m[1]} query={query} />;
@@ -24,6 +27,16 @@ function Routes() {
     <Empty>
       This page does not exist. <a href="#/">Go to the board</a>
     </Empty>
+  );
+}
+
+/** Re-mounts on each route so the page fades in once (no motion under reduced motion). */
+function PageFrame() {
+  const { path } = parse(useRoute());
+  return (
+    <div key={path} className="page-enter">
+      <Routes />
+    </div>
   );
 }
 
@@ -84,10 +97,7 @@ function Shell() {
       <header className="top">
         <div className="top-inner">
           <a className="brand" href="#/">
-            <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
-              <rect width="32" height="32" rx="7" fill="var(--accent)" />
-              <path d="M9 22l7-13 7 13" fill="none" stroke="var(--accent-ink)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <Mark />
             QuestMaster
           </a>
           <span className="net" title={`Chain ${config.chainId}, ${config.rpcUrl}`}>
@@ -98,6 +108,8 @@ function Shell() {
             <NavLink to="/paid">Paid</NavLink>
             <NavLink to="/mine">My quests</NavLink>
             <NavLink to="/post">Post</NavLink>
+            <NavLink to="/how">How it works</NavLink>
+            <NavLink to="/agents">AI agents</NavLink>
           </nav>
           <div className="top-actions">
             <ThemeToggle />
@@ -111,7 +123,7 @@ function Shell() {
         )}
       </header>
       <main id="main" className="main" tabIndex={-1}>
-        <Routes />
+        <PageFrame />
       </main>
       <footer className="foot">
         <p>
@@ -121,6 +133,7 @@ function Shell() {
             {config.realmPath}
           </a>
         </p>
+        <PriceFootnote />
         <p className="muted">Not an official Gno.land product. Testnet only: {config.networkName} ({config.chainId}), test GNOT.</p>
       </footer>
     </>

@@ -3,6 +3,9 @@ import { gnowebPage, pkgStatusPage } from "../config";
 import { QuestState, type Quest } from "../lib/amino";
 import { approx, gnot, shortAddr, thousands } from "../lib/format";
 import { ReadError } from "../lib/rpc";
+import { Usd } from "./price";
+import { useCountUp } from "./motion";
+import { EmptyArt, ErrorArt, SkeletonRows, WaitingArt } from "./visuals";
 
 export function stateLabel(q: Quest): string {
   const base = {
@@ -23,15 +26,36 @@ export function StateBadge({ q }: { q: Quest }) {
     [QuestState.Paid]: "paid",
     [QuestState.Cancelled]: "cancelled",
   }[q.state];
-  return <span className={`badge badge-${cls}`}>{stateLabel(q)}</span>;
+  const closing = q.closing && q.state !== QuestState.Paid && q.state !== QuestState.Cancelled;
+  return <span className={`badge badge-${cls}${closing ? " badge-closing" : ""}`}>{stateLabel(q)}</span>;
 }
 
-export function Gnot({ ugnot }: { ugnot: bigint }) {
+/** A GNOT amount, with the approximate dollar value after it (or under it with usd="block"). */
+export function Gnot({ ugnot, usd = "inline" }: { ugnot: bigint; usd?: "inline" | "block" | "none" }) {
   return (
-    <span className="amount">
-      {gnot(ugnot)} <span className="unit">GNOT</span>
-    </span>
+    <>
+      <span className="amount">
+        {gnot(ugnot)} <span className="unit">GNOT</span>
+      </span>
+      {usd !== "none" && <Usd ugnot={ugnot} block={usd === "block"} />}
+    </>
   );
+}
+
+/** A whole number that counts up once on first show (at once under reduced motion). */
+export function CountInt({ n }: { n: number | bigint }) {
+  const target = Number(n);
+  const v = useCountUp(target);
+  return <>{v === target ? n.toString() : Math.round(v).toString()}</>;
+}
+
+/** A GNOT total that counts up once; ends on the exact value. */
+export function CountGnot({ ugnot }: { ugnot: bigint }) {
+  const exact = gnot(ugnot);
+  const target = Number(ugnot) / 1e6;
+  const v = useCountUp(target);
+  const decimals = exact.includes(".") ? exact.split(".")[1].length : 0;
+  return <>{v === target ? exact : v.toFixed(decimals)}</>;
 }
 
 /** An address shown short, with the full value on hover and a link to its quests. */
@@ -58,10 +82,12 @@ export function SafeLink({ url }: { url: string }) {
   );
 }
 
+/** A skeleton of the coming table, announced as "Loading…" to screen readers. */
 export function Loading({ what = "Loading" }: { what?: string }) {
   return (
-    <div className="state-box" role="status" aria-live="polite">
-      <span className="spinner" aria-hidden="true" /> {what}…
+    <div className="skeleton-wrap" role="status" aria-live="polite" aria-busy="true">
+      <span className="sr-only">{what}…</span>
+      <SkeletonRows n={5} />
     </div>
   );
 }
@@ -69,7 +95,8 @@ export function Loading({ what = "Loading" }: { what?: string }) {
 export function ErrorBox({ error, onRetry }: { error: Error; onRetry?: () => void }) {
   const notLive = error instanceof ReadError && error.kind === "not-live";
   return (
-    <div className={`state-box ${notLive ? "waiting" : "error"}`} role="alert">
+    <div className={`state-box with-art ${notLive ? "waiting" : "error"}`} role="alert">
+      {notLive ? <WaitingArt /> : <ErrorArt />}
       <strong>{notLive ? "Not live yet" : "Could not load this"}</strong>
       <p>{error.message}</p>
       {notLive && (
@@ -97,7 +124,12 @@ export function ErrorBox({ error, onRetry }: { error: Error; onRetry?: () => voi
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="state-box empty">{children}</div>;
+  return (
+    <div className="state-box with-art empty">
+      <EmptyArt />
+      <p>{children}</p>
+    </div>
+  );
 }
 
 export function QuestTable({ quests, show }: { quests: Quest[]; show: "open" | "paid" | "any" }) {
@@ -116,14 +148,14 @@ export function QuestTable({ quests, show }: { quests: Quest[]; show: "open" | "
           </tr>
         </thead>
         <tbody>
-          {quests.map((q) => (
-            <tr key={q.id.toString()}>
+          {quests.map((q, i) => (
+            <tr key={q.id.toString()} style={{ ["--r" as string]: i }}>
               <td className="num muted">{q.id.toString()}</td>
               <td className="title-cell">
                 <a href={`#/quest/${q.id}`}>{q.title}</a>
               </td>
               <td className="num">
-                <Gnot ugnot={q.reward} />
+                <Gnot ugnot={q.reward} usd="block" />
               </td>
               {show === "open" && <td className="hide-sm muted nowrap" title={approx(q.workBlocks)}>{thousands(q.workBlocks)} blocks</td>}
               {show === "paid" && (
@@ -160,11 +192,12 @@ export function Pager({ page, total, pageSize, base }: { page: number; total: nu
   );
 }
 
-export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
+export function CopyButton({ text, label = "Copy", name }: { text: string; label?: string; name?: string }) {
   const [done, setDone] = useState(false);
   return (
     <button
       className="btn btn-small"
+      aria-label={name ? `${done ? "Copied" : label}: ${name}` : undefined}
       onClick={() => {
         navigator.clipboard?.writeText(text).then(
           () => {

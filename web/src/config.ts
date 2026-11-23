@@ -1,15 +1,17 @@
 // The one place that says which network and realm the app talks to.
 // Values come from VITE_* variables (see .env); the defaults are Onyx.
 
+import { defaults } from "./defaults";
+
 function env(name: string, fallback: string): string {
   const v = (import.meta.env as Record<string, string | undefined>)[name];
   return v && v.trim() !== "" ? v.trim() : fallback;
 }
 
 export const config = {
-  chainId: env("VITE_CHAIN_ID", "onyx-1"),
-  networkName: env("VITE_NETWORK_NAME", "Onyx testnet"),
-  rpcUrl: env("VITE_RPC_URL", "https://rpc.onyx.testnets.gno.land:443"),
+  chainId: env("VITE_CHAIN_ID", defaults.VITE_CHAIN_ID),
+  networkName: env("VITE_NETWORK_NAME", defaults.VITE_NETWORK_NAME),
+  rpcUrl: env("VITE_RPC_URL", defaults.VITE_RPC_URL),
   realmPath: env("VITE_REALM_PATH", "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster"),
   gnowebUrl: env("VITE_GNOWEB_URL", "https://onyx.testnets.gno.land"),
   explorerTxUrl: env("VITE_EXPLORER_TX_URL", "https://gnoscan.io/transactions/details?txhash={hash}&chainId=onyx-1"),
@@ -17,6 +19,13 @@ export const config = {
   sourceUrl: env("VITE_SOURCE_URL", "https://github.com/elangrr/questmaster"),
   /** The network's package-approval status page ({path} = package path); "" if none. */
   pkgStatusUrl: env("VITE_PKG_STATUS_URL", "https://gpas.onyx.testnets.gno.land/?path={path}"),
+  /**
+   * Where the approximate dollar hint gets the GNOT price: "coingecko" (the
+   * default) or "off" (no request, no dollar figures). VITE_GNOT_USD, when
+   * set to a number, is used instead and nothing is fetched.
+   */
+  gnotUsdSource: env("VITE_GNOT_USD_SOURCE", "coingecko").toLowerCase(),
+  gnotUsdManual: env("VITE_GNOT_USD", ""),
 };
 
 /** The official approval status page for the realm, or null. */

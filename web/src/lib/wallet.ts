@@ -124,7 +124,13 @@ export async function switchNetwork(): Promise<void> {
 }
 
 /** Sign and broadcast one call. Returns the transaction hash. */
+/** Signs and sends one call; resolves with the hash once Adena reports it. */
 export async function send(msg: MsgCall): Promise<string> {
+  return (await sendTx(msg)).hash;
+}
+
+/** Like send, plus the block height Adena reports for the transaction (null if it gives none). */
+export async function sendTx(msg: MsgCall): Promise<{ hash: string; height: bigint | null }> {
   const a = need();
   const acc = await account();
   if (acc.chainId !== config.chainId)
@@ -137,5 +143,6 @@ export async function send(msg: MsgCall): Promise<string> {
   const deliverErr = d.deliverTx?.ResponseBase?.Error ?? d.checkTx?.ResponseBase?.Error;
   if (deliverErr) throw new WalletError("failed", failed ? `The chain refused it: ${failed}` : "The transaction failed on chain.");
   if (typeof d.hash !== "string" || d.hash === "") throw new WalletError("failed", "Adena did not return a transaction hash. Check the quest: it may have gone through.");
-  return d.hash;
+  const height = typeof d.height === "string" && /^\d{1,19}$/.test(d.height) ? BigInt(d.height) : typeof d.height === "number" && Number.isSafeInteger(d.height) && d.height > 0 ? BigInt(d.height) : null;
+  return { hash: d.hash, height };
 }
