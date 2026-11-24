@@ -26,11 +26,11 @@ the wait out afterwards.
 | 0:00 | Board home page | Scroll slowly from the hero and escrow diagram to the totals bar below it and the open quests. | "This is QuestMaster, a bounty board on Gno.land. You post a small task and lock the reward in GNOT. A builder does the work, and the realm pays them when you approve. It runs on the Onyx testnet with test GNOT." |
 | 0:20 | Home page, "Post a quest" links | Switch Adena to **Poster**. Click "5 GNOT". | "Let's post a quest with a 5 GNOT reward." |
 | 0:25 | gnoweb form for PostQuest | Type the title and details, work window `20000`. Turn on the switch that adds the 5 GNOT. Sign in Adena. | "The form already holds the reward. I confirm sending it, fill in the task, and sign. The 5 GNOT is now locked in the realm, not with me and not with anyone else." |
-| 0:45 | Home page | Reload; point at the new row and "GNOT locked" in the totals bar below the hero. | "The quest is open, and the board shows the locked reward." |
+| 0:45 | Home page | Wait for the new row (the board checks the chain by itself every 15 seconds); point at it and "GNOT locked" in the totals bar below the hero. | "The quest is open, and the board shows the locked reward." |
 | 0:50 | Quest page | Open the quest. Point at "What can happen next". | "Every quest page shows only the moves that are possible now, and who may make them." |
-| 0:55 | Quest page | Switch Adena to **Builder** (connect if needed). On "Take this quest", click **Do this**, then **Take this quest**, and sign in Adena. | "Now I'm the builder. I take the quest. The work window starts now." |
-| 1:05 | Quest page | Reload. Click "Open in gnoweb" next to Submit work, paste the link, sign. | "I've done the work, so I submit a link to it." |
-| 1:15 | Quest page | Reload. Point at State "Submitted" and the review deadline. | "The poster now has about 7 days to approve or reject. If they never answer, the builder can claim the reward after that, so the board warns posters to check their quests." |
+| 0:55 | Quest page | Switch Adena to **Builder** (connect if needed). Click **Take this quest** and sign in Adena. The page shows "Updating status…", then "In progress", by itself. | "Now I'm the builder. I take the quest. The work window starts now." |
+| 1:05 | Quest page | Paste the link into "Link to the work", click **Submit work**, sign. | "I've done the work, so I submit a link to it." |
+| 1:15 | Quest page | Point at State "Submitted" and the review deadline (no reload needed). | "The poster now has about 7 days to approve or reject. If they never answer, the builder can claim the reward after that, so the board warns posters to check their quests." |
 | 1:20 | Quest page | Switch Adena to **Poster**. Click Approve, sign. | "Back as the poster. The work is good, so I approve." |
 | 1:30 | Adena, Builder account | Show the Builder's balance. | "The builder received exactly 5 GNOT, paid by the realm." |
 | 1:40 | Paid page | Open "Paid quests". | "The Paid page lists every quest the board has paid, as public proof." |

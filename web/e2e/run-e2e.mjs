@@ -2,8 +2,10 @@
 //  1. start gnodev on 127.0.0.1 with genesis transactions from seed-txs.mjs
 //     (quests in every state, a closing one, hostile text, two pages);
 //  2. build the app pointed at that node and serve it under /questmaster/;
-//  3. run the Playwright tests in e2e/app.spec.ts (headless Chromium).
-// Needs gno v1.8.0's gnodev on PATH. Uses a throwaway GNOHOME; no keys.
+//  3. run the Playwright tests (headless Chromium): e2e/app.spec.ts, then
+//     e2e/live.spec.ts, which sends transactions as gnodev's public test1
+//     account from a throwaway key folder (see e2e/chain.ts).
+// Needs gno v1.8.0's gnodev and gnokey on PATH. Uses a throwaway GNOHOME.
 import { spawn, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { gzipSync } from "node:zlib";

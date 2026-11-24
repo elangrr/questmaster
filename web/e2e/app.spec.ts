@@ -182,20 +182,29 @@ test("with a mocked Adena: connect, wrong network, claim sends the exact message
       On: () => true,
     };
   }, [BUILDER]);
+  await page.clock.install();
   await open(page, "/quest/31");
-  // Not connected yet: one sign-in bar holds "Connect wallet"; the actions have no "Do this".
+  // Not connected yet: one sign-in bar holds "Connect wallet"; the actions only offer other ways to sign.
   const claim = page.locator(".action", { hasText: "Take this quest" });
-  await expect(claim.getByRole("button", { name: "Do this" })).toHaveCount(0);
+  await expect(claim.getByRole("button", { name: "Take this quest" })).toHaveCount(0);
   await page.locator("[data-signin-bar]").getByRole("button", { name: "Connect wallet" }).click();
   // Wrong network: the header and the sign-in bar both offer the switch; use the header's.
   await expect(page.locator("[data-signin-bar]").getByRole("button", { name: "Switch to dev" })).toBeVisible();
   await page.locator("header").getByRole("button", { name: "Switch to dev" }).click();
   await expect(page.locator(".wallet-addr")).toHaveText("g1us8428…njlj");
-  await claim.getByRole("button", { name: "Do this" }).click();
+  // One real button named after the action; no "Do this" step anywhere. One click opens Adena.
+  await expect(page.getByRole("button", { name: "Do this" })).toHaveCount(0);
   await claim.getByRole("button", { name: "Take this quest" }).click();
   await expect(claim.locator(".txstep")).toHaveText(["Waiting for your wallet", "2Sent", "3Confirmed"]);
   await expect(claim.locator(".txstep.active")).toHaveCount(1);
   await page.evaluate(() => (window as any).__approve());
+  // The mocked transaction never reaches the chain, so the quest does not change: the page keeps checking with a spinner...
+  await expect(claim.locator(".txstep.active")).toHaveText("Updating status…");
+  await expect(page.locator(".ok")).toHaveCount(0);
+  // ...and after 30 seconds says plainly that it went through, without offering to send it again.
+  await page.clock.fastForward(31_000);
+  await expect(claim).toContainText("The transaction went through. This page will show the new status by itself");
+  await expect(claim.getByRole("button", { name: "Take this quest" })).toBeDisabled();
   await expect(page.locator(".ok")).toContainText("Sent: Take this quest. Transaction");
   await expect(page.locator(".ok")).toContainText("confirmed in block 1.");
   await expect(page.locator(".ok a")).toHaveAttribute("href", "https://gnoscan.io/transactions/details?txhash=ABC123hash%3D&chainId=dev");

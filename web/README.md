@@ -36,15 +36,20 @@ npm run e2e       # end-to-end, against a LOCAL gnodev chain (see below)
 1. starts `gnodev` (gno v1.8.0, must be on `PATH`) on 127.0.0.1 with a
    throwaway `GNOHOME`, and seeds it with genesis transactions from
    `e2e/seed-txs.mjs`: quests in every state, a closing quest, a quest with
-   hostile text (`e2e/hostile.mjs`) and two pages of open quests. No key is
-   created or used;
+   hostile text (`e2e/hostile.mjs`) and two pages of open quests;
 2. builds the app for that chain and serves it under `/questmaster/`, the
    way GitHub Pages would;
 3. runs `e2e/app.spec.ts` in headless Chromium (Playwright) and saves
    screenshots to `e2e/out/screenshots/`. The GNOT price request is answered
    inside the test, never sent to CoinGecko. Checks include: no animation
    left running under `prefers-reduced-motion`, no layout shift from the hero
-   diagram, and the three transaction steps with a mocked Adena.
+   diagram, and the three transaction steps with a mocked Adena;
+4. runs `e2e/live.spec.ts`, which changes the chain while a page is open:
+   pages that update by themselves without a reload, the wallet staying
+   connected across a reload (and not after disconnecting), and one-click
+   action buttons. It signs with gnokey as gnodev's built-in `test1` account,
+   whose mnemonic is public test data in the gno repository, from a
+   throwaway key folder deleted afterwards (`e2e/chain.ts`). Local chain only.
 
 Videos and Lighthouse numbers (phone profile) for reviews come from
 `e2e/media.spec.ts`, which runs only when given an output folder:
@@ -217,6 +222,25 @@ read functions (`GetTotals`, `GetQuest`, `OpenQuestIDs`, `PaidQuestIDs`,
 deployed", and `/status` for the block height. Identical reads within 4
 seconds share one request; failures are never cached.
 
+Pages follow the chain by themselves (`src/lib/live.ts`, `useLive` in
+`src/ui/hooks.ts`): a quest page reads the quest and the block height about
+every 4 seconds (one block is about 3.5), the board, the paid list and address
+pages every 15 seconds. Reading pauses while the tab is hidden and runs at once
+when it is visible again; it stops on a paid or cancelled quest. A background
+read that returns the same data changes nothing on screen, and a failed one
+keeps the last good page and tries again later (waiting longer after repeated
+failures, up to a minute). Polling reads ask for a fresh answer (a read is
+reused for at most 1 second), while identical reads in flight still share one
+request. On the board and the paid list a quiet tick costs two small reads:
+the quests themselves are read again only when the totals or the list change.
+
+After your own transaction the page re-reads the quest every second until it
+differs from what it was when you pressed the button, with a spinner and
+"Updating status…" until then. If it has not changed after 30 seconds, the page
+says the transaction went through and keeps checking at the normal pace. For
+30 seconds after the change, a read from a node that is a block behind (equal
+to the quest before the transaction) is ignored, so the page never flips back.
+
 `src/lib/amino.ts` decodes the typed JSON that `vm/qeval_json` returns and
 checks its exact shape (type names, field count, kinds). It uses the JSON form
 rather than the printed form of `vm/qeval`, because the printed form writes an
@@ -244,6 +268,24 @@ Each action is one `/vm.m_call` message:
 ```
 
 Only `PostQuest` has a `send` (`"5000000ugnot"`).
+
+Each action on a quest page is one button named after the action: one click
+opens Adena. An action that needs text (the work link, the reason for
+rejecting) has its field in the same row, and its button stays disabled until
+the text is valid. "Other ways to sign" under each action shows the gnokey
+command and the gnoweb form.
+
+**Staying connected.** After you connect, the app remembers only that you did
+(`qm-wallet-connected` in `localStorage`; no key and no address). On the next
+page load it waits for Adena to inject itself and asks `GetAccount`, which
+never opens a popup in Adena (`GET_ACCOUNT` is a non-popup request in the
+extension's `inject/message/message-handler.ts`). If the site is still
+connected you are back at once; if Adena is locked (`WALLET_LOCKED`) or no
+longer knows the site (`NOT_CONNECTED`), the header shows "Connect wallet" as
+usual (the flag is kept for a locked wallet and dropped otherwise).
+**Disconnect** (the icon next to your address) clears the flag; it does not
+remove the site from Adena's own list of connected sites. Adena's `On()`
+listeners cannot be removed, so the app registers them once per page.
 
 **With Adena, the wallet chooses the network fee.** `DoContract` takes no gas
 fields: Adena estimates the fee and shows it before you sign; the app cannot

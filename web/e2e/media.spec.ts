@@ -64,16 +64,15 @@ test("video: a mocked-wallet transaction from click to success", async ({ browse
       await page.goto(`${APP}#/quest/31`);
       const claim = page.locator(".action", { hasText: "Take this quest" });
       await page.waitForTimeout(800);
-      await claim.getByRole("button", { name: "Connect wallet" }).click();
-      await page.getByRole("button", { name: "Switch to dev" }).click();
-      await page.waitForTimeout(600);
-      await claim.getByRole("button", { name: "Do this" }).click();
+      await page.locator("[data-signin-bar]").getByRole("button", { name: "Connect wallet" }).click();
+      await page.locator("header").getByRole("button", { name: "Switch to dev" }).click();
       await page.waitForTimeout(800);
       await claim.getByRole("button", { name: "Take this quest" }).click();
       await page.waitForTimeout(1800); // "waiting for your wallet"
       await page.evaluate(() => (window as any).__approve());
-      await expect(page.locator(".ok")).toBeVisible();
-      await page.waitForTimeout(2500);
+      await expect(claim.locator(".txstep.active")).toHaveText("Updating status…");
+      await page.waitForTimeout(2500); // the mocked transaction never reaches the chain: the page keeps checking
+
     },
     (page) =>
       page.addInitScript(([builder]) => {

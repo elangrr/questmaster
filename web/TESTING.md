@@ -27,6 +27,13 @@ transaction link the app showed.
       and a gnoweb link (no wallet button repeated per action).
 - [ ] Click **Connect wallet** and approve in Adena: your short address appears
       top right.
+- [ ] Reload the page: you stay connected, with no Adena popup and no click.
+      While it reconnects the header shows a small spinner, not "Connect
+      wallet".
+- [ ] Lock Adena and reload: the header quietly shows "Connect wallet" (no
+      popup). Unlock Adena and reload: connected again.
+- [ ] Click the disconnect icon next to your address, then reload: "Connect
+      wallet" shows and stays.
 - [ ] Switch Adena to another network: the header and the quest page's bar show
       "Switch to onyx-1".
       Click it and approve: the button goes back to your address.
@@ -41,30 +48,42 @@ transaction link the app showed.
       your wallet" card updates with the reward, storage deposit and fee.
 - [ ] Click **Post and lock the reward**, check Adena shows a call to
       `PostQuest` with 2 GNOT sent, and sign.
-- [ ] The app shows "Sent: your quest" with a GnoScan link that opens.
+- [ ] Right after signing, the steps show a spinner with "Updating status…".
+      Then the app shows "Sent: your quest" with a GnoScan link that opens,
+      and an **Open quest N** button that opens the new quest.
 - [ ] On the board the quest appears with 2 GNOT; the totals bar below the hero
       shows 2 more GNOT locked and one more open quest.
 
 **Claiming and submitting (as Builder)**
-- [ ] Switch Adena to Builder. Open the quest. "Take this quest" is enabled;
-      "Cancel quest" is greyed out with "Only the poster can do this."
-- [ ] Take the quest and sign. The state becomes "In progress".
-- [ ] Submit work with `http://x` first: the app refuses it before signing.
-      Then submit a real `https://` link and sign. State: "Waiting for review".
+- [ ] Switch Adena to Builder. Open the quest. "Take this quest" is a button
+      of its own (no "Do this" step); "Cancel quest" is greyed out with "Only
+      the poster can do this."
+- [ ] Click **Take this quest** once: Adena opens straight away. Sign. The
+      steps show "Updating status…" with a spinner, then the page shows "In
+      progress" and the "Sent" notice by itself, without a reload.
+- [ ] The link field sits in the Submit work row. Type `http://x` first: the
+      **Submit work** button stays disabled with the reason under the field.
+      Then type a real `https://` link, click **Submit work** and sign. State:
+      "Waiting for review".
 
 **Reviewing (as Poster)**
+- [ ] Live status: keep the quest open as Poster in a second browser profile
+      (or a second browser with Adena) while Builder submits. Within a few
+      seconds the Poster's page shows "Waiting for review" with **Approve and
+      pay** and **Reject the work**, without a reload.
 - [ ] Switch to Poster. The quest shows the review warning and the review
       deadline (about 7 days).
 - [ ] Try **Take this quest** on your own open quest (post another one first):
-      its **Do this** button is disabled and the line under it says "You posted
-      this quest; someone else must take it."
+      its button is disabled and the line under it says "You posted this
+      quest; someone else must take it."
 - [ ] On the submitted quest, click **Approve and pay**, sign.
 - [ ] Builder's balance went up by exactly 2 GNOT (Adena, or GnoScan).
       The quest shows "Paid" and appears on the **Paid** page.
 
 **Reject, close and cancel**
-- [ ] Post a quest, take it as Builder, submit, then as Poster **Reject** with a
-      reason that has a line break. The quest is Open again, "Times rejected 1",
+- [ ] Post a quest, take it as Builder, submit, then as Poster click **Reject
+      the work**: the reason field opens under it and the same button signs
+      once there is a reason. Use a reason that has a line break. The quest is Open again, "Times rejected 1",
       and the reason shows with its line break.
 - [ ] Take it again as Builder. As Poster, **Close quest**: the state badge
       shows "In progress · closing" and the closing note says "Closing. The
