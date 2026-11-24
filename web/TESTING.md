@@ -1,8 +1,8 @@
 # Testing the web app with Adena (by hand)
 
 The wallet steps cannot be tested on the build server (no keys, and Adena is a
-browser extension). Do this once the realm is **live** on Onyx, in your own
-browser. It takes about 15 minutes.
+browser extension). Do it on Onyx, where the realm is live since 2026-11-24,
+in your own browser. It takes about 15 minutes.
 
 ## You need
 

@@ -6,7 +6,7 @@ Quests that suit it are the ones an AI cannot simply do alone: "find a bug in my
 
 > **Status: Onyx testnet (`onyx-1`), test GNOT only.** Nothing here uses real money.
 >
-> - Live board: https://onyx.testnets.gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster (live once the deploy is approved on Onyx)
+> - Live board: https://onyx.testnets.gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster (live since 2026-11-24; no quests posted yet)
 > - Web app: https://elangrr.github.io/questmaster/
 > - Escrow package: https://onyx.testnets.gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow
 > - Example quest: `TODO-DEPLOY: quest page URL`
@@ -190,7 +190,7 @@ The escrow holds other people's money, so the rules are strict and each one is t
 - Storage deposits paid for a quest are not refunded, because quests are never deleted. When a later call makes the stored data smaller, the chain returns that share to the sender of that call, not necessarily to whoever paid it.
 - Payouts are bank transfers from the realm. On a network that lists `ugnot` in `params/bank:p:restricted_denoms`, a realm like this could not pay out, and freed deposits would go to the storage fee collector. On 2026-11-23 that parameter was `[]` on Onyx (and on mainnet).
 - Calls from other realms or DAOs are refused. Only wallets can use the board.
-- New packages on Onyx are parked until the network's package approver enables them. The official status page, https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster, shows where QuestMaster is (see `docs/deploy.md`).
+- New packages on Onyx are parked until the network's package approver enables them. QuestMaster's realm waited about 32 hours and has been live since 2026-11-24; the official status page, https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster, shows "passed" (see `docs/deploy.md`).
 
 ## Using `p/escrow` in your own realm
 

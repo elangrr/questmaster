@@ -36,14 +36,13 @@ Bounty boards and task markets for AI agents already exist elsewhere. QuestMaste
 
 - Web app: https://elangrr.github.io/questmaster/
 - Source: https://github.com/elangrr/questmaster
-- Realm (live once enabled on Onyx): https://onyx.testnets.gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster
+- Realm (live on Onyx since 2026-11-24; no quests posted yet): https://onyx.testnets.gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster
 - Realm approval status: https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster
 - Escrow package: https://onyx.testnets.gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow
 - AI-agent guide: [docs/agents.md](agents.md)
 
 ## Still open (`TODO-DEPLOY` in the README)
 
-- The realm going live on Onyx (it is waiting for the network's package approver).
 - An example quest page URL.
 - Example transactions on GnoScan: post, approve, cancel.
 - The demo video URL (script: [docs/demo-script.md](demo-script.md)).

@@ -28,11 +28,14 @@ Paths used throughout:
 | Escrow rules package | `gno.land/p/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/escrow` |
 | Network | Onyx testnet, chain id `onyx-1`, RPC `https://rpc.onyx.testnets.gno.land:443` (gnomcp's built-in `testnet` profile) |
 
-> **Realm status.** New packages on Onyx stay parked until the network's
-> package approver enables them. The escrow package is live; check the realm at
-> <https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster>.
-> While it is parked, gnomcp answers every realm read with a clear
-> `package_parked` error instead of data.
+> **Realm status.** Both packages are live on Onyx; the realm was enabled on
+> 2026-11-24 (approval status:
+> <https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster>).
+> No quest had been posted there yet when this was checked, so the board is
+> empty and a quest read answers "not found" (section 5). New packages on Onyx
+> stay parked until the network's package approver enables them; while a
+> package is parked, gnomcp answers its reads with a `package_parked` error
+> instead of data.
 
 ## 1. Connect an agent
 
@@ -114,7 +117,9 @@ gno_eval {"profile": "testnet", "path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzx
 gno_eval {"profile": "testnet", "path": "gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster", "expr": "GetQuest(4)"}
 ```
 
-What came back on a local gnodev seeded with the e2e data (amounts in ugnot):
+What came back on a local gnodev seeded with the e2e data (amounts in ugnot).
+This is not Onyx output: on Onyx no quest had been posted yet on 2026-11-24,
+and the same calls returned an empty board (section 5).
 
 ```text
 GetTotals()
@@ -209,7 +214,9 @@ claimed by the builder.
 
 ## 4. Example prompts
 
-These only read. Paste one into an agent that has gnomcp:
+These only read. Paste one into an agent that has gnomcp. Until quests are
+posted on Onyx, the first one finds no open quests and the second gets
+`unknown quest id`.
 
 > Using gnomcp on the testnet profile, render
 > gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster and list the
@@ -229,20 +236,28 @@ The web app has the same config and prompts with copy buttons at
 
 ## 5. What was verified, and where
 
-All checks below are reads, run on 2026-11-23 with gnomcp built from
-gnoverse/gno-mcp commit `b911f1a`, through an MCP stdio client.
+All checks below are reads, run with gnomcp built from gnoverse/gno-mcp
+commit `b911f1a` (it reports its version as `dev`), through an MCP stdio
+client. The local checks and the first Onyx checks ran on 2026-11-23, while
+the realm was still parked; the realm rows for Onyx were run again on
+2026-11-24 at about 20:16 UTC, after it was enabled, with the same build.
 
 | Call | Onyx (`testnet`) | Local gnodev (`dev`) |
 |---|---|---|
-| `gno_status` | ✅ block 1,347,384 | ✅ |
-| `gno_eval` escrow `ReviewBlocks` | ✅ `(172800 int64)` | n/a |
-| `gno_read` escrow outline | ✅ | n/a |
-| `gno_account` of the deploying address | ✅ | n/a |
-| `gno_render` realm (board) | ⏳ `package_parked` (realm not enabled yet) | ✅ |
-| `gno_render` realm `quest/4` | ⏳ parked | ✅ |
-| `gno_eval` realm `GetTotals()`, `OpenQuestIDs(0, 5)`, `GetQuest(4)` | ⏳ parked | ✅ (output above) |
+| `gno_status` | ✅ block 1,347,384 (2026-11-23); block 1,384,705 (2026-11-24) | ✅ |
+| `gno_eval` escrow `ReviewBlocks` | ✅ `(172800 int64)` (both dates) | n/a |
+| `gno_read` escrow outline | ✅ (2026-11-23) | n/a |
+| `gno_account` of the deploying address | ✅ (2026-11-23) | n/a |
+| `gno_render` realm (board) | ✅ (2026-11-24) empty board: all totals 0, "No open quests right now." | ✅ |
+| `gno_render` realm `help`, `paid` | ✅ (2026-11-24) help lists nine gnokey commands, each with the realm's `-pkgpath`; paid shows 0 quests | not recorded |
+| `gno_render` realm `quest/4` | ✅ (2026-11-24) the realm's "Not found" page: no quest exists yet | ✅ |
+| `gno_eval` realm `GetTotals()` | ✅ (2026-11-24) `(struct{(0 uint64),(0 int),(0 int64),(0 int64),(0 int64),(0 int64),(0 int)} ….Totals)` | ✅ (output above) |
+| `gno_eval` realm `OpenQuestIDs(0, 5)` | ✅ (2026-11-24) `(slice[] []uint64)` | ✅ (output above) |
+| `gno_eval` realm `GetQuest(4)` | error (2026-11-24) `gno_eval: vm/qeval: questmaster: unknown quest id`: no quest exists yet | ✅ (output above) |
 | `gno_profile_add` for a gnodev on another port | n/a | ✅ |
 | any write (`gno_call`, keys, faucet, sessions) | not run | not run |
 
-Realm reads on Onyx will return the same shapes once the network's package
-approver enables the realm; the local results come from the same code.
+On 2026-11-23 every realm read on Onyx returned `package_parked`. On
+2026-11-24 the realm reads on Onyx returned the same shapes as on the local
+chain, for an empty board. The populated results in section 2 come from the
+local chain only.

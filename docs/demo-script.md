@@ -57,9 +57,9 @@ the wait out afterwards.
 ## Short clip: QuestMaster with an AI agent (30 to 45 seconds)
 
 A separate, short clip for social posts. It only reads the chain: no key, no
-transaction. Record it once the realm is live on Onyx (check the
-[package status page](https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1llc3lq3zmjtjdk29dk52munrzxt5ne746cl7r8/questmaster));
-until then the agent gets a "parked" answer instead of the board.
+transaction. The realm is live on Onyx since 2026-11-24, but record the clip
+only after the first quests are posted (`docs/deploy.md`, step (e)): until then
+the board is empty and the agent has no quest to list or eval.
 
 Setup: a terminal with Claude Code (or another MCP client) and gnomcp registered
 as in [docs/agents.md](agents.md); the web app open in a browser next to it.
