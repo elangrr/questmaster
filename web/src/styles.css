@@ -392,6 +392,10 @@ ul, ol { margin: 0 0 var(--s-3); }
 .nav-link.active { color: var(--ink); }
 .nav-link.active::after { transform: scaleX(1); }
 .top-actions { grid-area: actions; display: flex; gap: var(--s-2); align-items: center; }
+.wallet-pill { display: inline-flex; align-items: center; gap: var(--s-1); }
+.wallet-restoring { color: var(--muted); cursor: default; }
+.wallet-restoring .spinner { width: var(--icon-sm); height: var(--icon-sm); }
+@media (max-width: 419px) { .wallet-addr .addr-mid { display: none; } }
 .wallet-dot { width: var(--s-2); height: var(--s-2); border-radius: 50%; background: var(--ok); flex: none; }
 .top-error { margin: 0; padding: var(--s-2) var(--gutter); text-align: center; background: var(--danger-soft); color: var(--danger); font-size: var(--fs-small); }
 
@@ -802,6 +806,26 @@ table.quests { width: 100%; border-collapse: collapse; }
   .action-row { flex-direction: column; }
   .action-buttons { width: 100%; }
 }
+/* An action that needs text: the field spans the row and its button sits beside the control, in the button column;
+   on phones the button comes after the hint. */
+.field.action-input { margin-top: var(--s-3); grid-template-columns: minmax(0, 1fr) var(--action-w); column-gap: var(--s-4); }
+.action-input > * { grid-column: 1; }
+.action-input > .field-label { grid-column: 1 / -1; }
+.action-input > .action-input-button { grid-column: 2; grid-row: 2; }
+.action-input-button .btn { width: 100%; }
+@media (max-width: 699px) {
+  .field.action-input { grid-template-columns: minmax(0, 1fr); }
+  .action-input > .action-input-button { grid-column: 1; grid-row: auto; margin-top: var(--s-2); }
+}
+.action .rec-note { margin: var(--s-3) 0 0; }
+.action-status { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); margin-top: var(--s-2); min-width: 0; }
+.action-status:has(.txsteps) { margin-top: var(--s-3); }
+.tx-notice { margin: 0 0 var(--s-3); }
+.tx-notice:focus { outline: none; }
+.wallet-wait { display: inline-flex; align-items: center; gap: var(--s-2); }
+.wallet-wait .spinner { flex: none; }
+.posted { display: grid; gap: var(--s-3); }
+.posted-next { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3); margin: 0; }
 
 /* ------------------------------------------------------------ post & forms */
 .post-head { margin-bottom: var(--s-5); }

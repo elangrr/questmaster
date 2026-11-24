@@ -81,6 +81,16 @@ function NavLink({ to, children }: { to: string; children: string }) {
 
 function WalletButton() {
   const w = useWallet();
+  // Reconnecting silently after a reload: a quiet placeholder instead of a "Connect wallet" that would swap a moment later.
+  if (w.restoring)
+    return (
+      <span className="btn btn-small wallet-restoring" role="status" aria-label="Reconnecting your wallet">
+        <span className="spinner" aria-hidden="true" />
+        <span className="wallet-restoring-text" aria-hidden="true">
+          Wallet
+        </span>
+      </span>
+    );
   if (!w.installed)
     return (
       <a className="btn btn-small" href="https://adena.app" target="_blank" rel="noopener noreferrer">
@@ -100,10 +110,20 @@ function WalletButton() {
       </button>
     );
   return (
-    <a className="btn btn-small wallet-addr mono" href={`#/address/${w.address}`} title={w.address}>
-      <span className="wallet-dot" aria-hidden="true" />
-      {shortAddr(w.address)}
-    </a>
+    <span className="wallet-pill">
+      <a className="btn btn-small wallet-addr mono" href={`#/address/${w.address}`} title={w.address}>
+        <span className="wallet-dot" aria-hidden="true" />
+        {/* Same text as shortAddr(); on the narrowest phones the middle part hides to leave room for the brand. */}
+        <span>
+          {w.address.slice(0, 2)}
+          <span className="addr-mid">{shortAddr(w.address).slice(2, 8)}</span>
+          {shortAddr(w.address).slice(8)}
+        </span>
+      </a>
+      <button className="btn btn-small btn-ghost wallet-off" onClick={w.disconnect} aria-label="Disconnect wallet" title="Disconnect wallet">
+        <Icon name="logout" />
+      </button>
+    </span>
   );
 }
 

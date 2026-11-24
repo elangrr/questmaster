@@ -4,15 +4,16 @@ import { config, gnowebPage, rules } from "../config";
 import { argsFor, actionsFor, NOT_CONNECTED, roleOf, type ActionOption } from "../lib/actions";
 import { QuestState, type Quest, type Totals } from "../lib/amino";
 import { approx, gnot, thousands, windowToBlocks, type WindowUnit } from "../lib/format";
-import { read } from "../lib/rpc";
+import { findPosted, sameValue, LIST_POLL_MS, QUEST_POLL_MS, acceptQuestRead, STALE_GUARD_MS, waitFor, waitForQuestChange, type StaleGuard } from "../lib/live";
+import { read, type ReadOpts } from "../lib/rpc";
 import { checkDetails, checkLink, checkReason, checkReward, checkTitle, checkWorkBlocks } from "../lib/validate";
-import { useAsync } from "./hooks";
+import { useLive } from "./hooks";
 import { Addr, CopyButton, Empty, ErrorBox, Gnot, GnotTotal, Loading, Pager, PlainText, QuestTable, SafeLink, StateBadge } from "./parts";
 import { useMinWidth } from "./motion";
 import { Usd } from "./price";
 import { PosterNote, RecordLine, RecordPanel } from "./record";
 import { DeadlineFact, QuestFlow, QuestStepper, SkeletonBoard, SkeletonQuest, StepArt } from "./visuals";
-import { TxPanel, TxSent } from "./TxPanel";
+import { TxFallback, TxPanel, TxSent, TxStatus, useTx, type TxHooks } from "./TxPanel";
 import { useWallet } from "./WalletContext";
 
 function pageFrom(query: URLSearchParams): number {
@@ -105,13 +106,30 @@ export function TotalsLine({ totals: t }: { totals: Totals }) {
   );
 }
 
+/**
+ * A list page's data: totals, one page of ids and their quests. On a
+ * background read the quests are read again only when the totals or the ids
+ * changed (any move into or out of the list changes them), so a quiet board
+ * costs two small reads per tick.
+ */
+async function listPage(o: ReadOpts | undefined, shown: ListData | undefined, ids: (o?: ReadOpts) => Promise<bigint[]>): Promise<ListData> {
+  const [totals, idList] = await Promise.all([read.totals(o), ids(o)]);
+  if (shown && sameValue(shown.totals, totals) && sameValue(shown.ids, idList)) return shown;
+  return { totals, ids: idList, quests: await read.quests(idList, o) };
+}
+interface ListData {
+  totals: Totals;
+  ids: bigint[];
+  quests: Quest[];
+}
+
 export function Board({ query }: { query: URLSearchParams }) {
   const page = pageFrom(query);
-  const [data, reload] = useAsync(async () => {
-    const totals = await read.totals();
-    const ids = await read.openIds((page - 1) * rules.pageSize, rules.pageSize);
-    return { totals, quests: await read.quests(ids) };
-  }, [page]);
+  const { state: data, reload } = useLive(
+    (o, shown: ListData | undefined) => listPage(o, shown, (o) => read.openIds((page - 1) * rules.pageSize, rules.pageSize, o)),
+    [page],
+    { pollMs: LIST_POLL_MS },
+  );
   // Phones get no diagram at all (not rendered, so nothing loads or animates there):
   // the steps are one tap away on How it works, and the quests come first.
   const wide = useMinWidth(700);
@@ -184,11 +202,11 @@ export function Board({ query }: { query: URLSearchParams }) {
 
 export function Paid({ query }: { query: URLSearchParams }) {
   const page = pageFrom(query);
-  const [data, reload] = useAsync(async () => {
-    const totals = await read.totals();
-    const ids = await read.paidIds((page - 1) * rules.pageSize, rules.pageSize);
-    return { totals, quests: await read.quests(ids) };
-  }, [page]);
+  const { state: data, reload } = useLive(
+    (o, shown: ListData | undefined) => listPage(o, shown, (o) => read.paidIds((page - 1) * rules.pageSize, rules.pageSize, o)),
+    [page],
+    { pollMs: LIST_POLL_MS },
+  );
   return (
     <section>
       <h1>Paid quests</h1>
@@ -220,15 +238,20 @@ export function AddressPage({ address, query }: { address: string; query: URLSea
   const page = pageFrom(query);
   const as = query.get("as") === "builder" ? "builder" : "poster";
   const valid = /^g1[02-9ac-hj-np-z]{38}$/.test(address);
-  const [data, reload] = useAsync(async () => {
-    if (!valid) return null;
-    const off = (page - 1) * rules.pageSize;
-    const [count, ids] =
-      as === "poster"
-        ? await Promise.all([read.posterCount(address), read.posterIds(address, off, rules.pageSize)])
-        : await Promise.all([read.builderCount(address), read.builderIds(address, off, rules.pageSize)]);
-    return { count, quests: await read.quests(ids) };
-  }, [address, as, page]);
+  // Quests here show their state, which changes without changing the ids, so each tick reads them again.
+  const { state: data, reload } = useLive(
+    async (o) => {
+      if (!valid) return null;
+      const off = (page - 1) * rules.pageSize;
+      const [count, ids] =
+        as === "poster"
+          ? await Promise.all([read.posterCount(address, o), read.posterIds(address, off, rules.pageSize, o)])
+          : await Promise.all([read.builderCount(address, o), read.builderIds(address, off, rules.pageSize, o)]);
+      return { count, quests: await read.quests(ids, o) };
+    },
+    [address, as, page],
+    { pollMs: valid ? LIST_POLL_MS : null },
+  );
   return (
     <section>
       <h1>Quests of an address</h1>
@@ -304,6 +327,15 @@ export function Mine() {
     if (w.address) window.location.replace(`#/address/${w.address}`);
   }, [w.address]);
   if (w.address) return null;
+  if (w.restoring)
+    return (
+      <section className="narrow">
+        <h1>My quests</h1>
+        <p className="lead wallet-wait" role="status">
+          <span className="spinner" aria-hidden="true" /> Reconnecting your wallet…
+        </p>
+      </section>
+    );
   return (
     <section className="narrow">
       <h1>My quests</h1>
@@ -324,11 +356,22 @@ export function Mine() {
 
 export function QuestPage({ id }: { id: string }) {
   const valid = /^[1-9]\d{0,18}$/.test(id);
-  const [data, reload] = useAsync(async () => {
-    if (!valid) return null;
-    const [q, h] = await Promise.all([read.quest(BigInt(id)), read.height()]);
-    return { q, h };
-  }, [id]);
+  // After the user's own transaction: a read equal to the quest before it is a lagging node; ignore it for a while.
+  const guard = useRef<StaleGuard | null>(null);
+  const { state: data, reload, refresh } = useLive(
+    async (o) => {
+      if (!valid) return null;
+      const [q, h] = await Promise.all([read.quest(BigInt(id), o), read.height(o)]);
+      return { q, h };
+    },
+    [id],
+    {
+      pollMs: valid ? QUEST_POLL_MS : null,
+      // Paid and Cancelled are final: nothing more can happen, so stop reading.
+      stopWhen: (v) => v !== null && (v.q.state === QuestState.Paid || v.q.state === QuestState.Cancelled),
+      accept: (next) => next === null || acceptQuestRead(next.q, guard.current, Date.now()),
+    },
+  );
   if (!valid)
     return (
       <Empty>
@@ -338,10 +381,10 @@ export function QuestPage({ id }: { id: string }) {
   if (data.status === "loading") return <SkeletonQuest />;
   if (data.status === "error") return <ErrorBox error={data.error} onRetry={reload} />;
   if (!data.value) return null;
-  return <QuestView q={data.value.q} h={data.value.h} onChanged={reload} />;
+  return <QuestView q={data.value.q} h={data.value.h} refresh={refresh} guard={guard} />;
 }
 
-function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => void }) {
+function QuestView({ q, h, refresh, guard }: { q: Quest; h: bigint; refresh: () => Promise<void>; guard: { current: StaleGuard | null } }) {
   const w = useWallet();
   const [lastTx, setLastTx] = useState<{ what: string; hash: string; block: bigint | null } | null>(null);
   const role = roleOf(q, w.address);
@@ -353,6 +396,47 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
   // The bar's "Other ways to sign" opens the first action that is not blocked for another reason.
   const firstOpen = options.find((o) => o.blocked === null || o.blocked === NOT_CONNECTED)?.func ?? null;
   const [request, setRequest] = useState<{ func: string; n: number } | null>(null);
+
+  // One transaction at a time: while one is being signed or confirmed, the other actions wait.
+  const [pending, setPending] = useState<string | null>(null);
+  const qNow = useRef(q);
+  qNow.current = q;
+  const before = useRef<Quest | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const notice = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // The row that sent the transaction is usually gone now; keep keyboard focus on the page.
+    if (lastTx && (document.activeElement === document.body || document.activeElement === null)) notice.current?.focus({ preventScroll: true });
+  }, [lastTx]);
+
+  const hooksFor = (o: ActionOption): TxHooks => ({
+    onStart: () => {
+      before.current = qNow.current;
+      setPending(o.func);
+    },
+    onFailed: () => setPending(null),
+    // Keep reading until the quest is no longer what it was when the user pressed the button.
+    onSent: async (hash, block) => {
+      const b = before.current ?? qNow.current;
+      const changed = await waitForQuestChange(() => read.quest(b.id, { maxAgeMs: 0 }), b, { cancelled: () => !mounted.current });
+      if (changed) {
+        guard.current = { before: b, until: Date.now() + STALE_GUARD_MS };
+        await refresh().catch(() => {});
+      }
+      if (mounted.current) {
+        setLastTx({ what: o.label, hash, block });
+        setPending(null);
+      }
+      return changed ? "updated" : "timeout";
+    },
+  });
+
   return (
     <article className="quest">
       <div className="quest-top">
@@ -464,7 +548,11 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
 
         <section>
           <h2>What can happen next</h2>
-          {lastTx && <TxSent hash={lastTx.hash} what={lastTx.what} block={lastTx.block} celebrate={finished} />}
+          {lastTx && (
+            <div ref={notice} tabIndex={-1} className="tx-notice">
+              <TxSent hash={lastTx.hash} what={lastTx.what} block={lastTx.block} celebrate={finished} />
+            </div>
+          )}
           {q.state === QuestState.Paid && (
             <p className="settled-note">
               Nothing: this quest is finished and the builder was paid <Gnot ugnot={q.reward} />.
@@ -483,10 +571,8 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
                   o={o}
                   walletReady={walletReady}
                   request={request?.func === o.func ? request.n : 0}
-                  onDone={(hash, block) => {
-                    setLastTx({ what: o.label, hash, block });
-                    onChanged();
-                  }}
+                  locked={pending !== null && pending !== o.func}
+                  hooks={hooksFor(o)}
                 />
               ))}
             </ul>
@@ -506,9 +592,16 @@ function QuestView({ q, h, onChanged }: { q: Quest; h: bigint; onChanged: () => 
 /** One bar above the action list while no wallet is ready: what is needed, the one wallet button, and other ways to sign. */
 function SignInBar({ onOtherWays }: { onOtherWays: (() => void) | null }) {
   const w = useWallet();
-  let text: string;
+  let text: ReactNode;
   let button: ReactNode;
-  if (!w.installed) {
+  if (w.restoring) {
+    text = (
+      <span className="wallet-wait" role="status">
+        <span className="spinner" aria-hidden="true" /> Reconnecting your wallet…
+      </span>
+    );
+    button = null;
+  } else if (!w.installed) {
     text = "To sign these actions here you need the Adena wallet.";
     button = (
       <a className="btn btn-primary" href="https://adena.app" target="_blank" rel="noopener noreferrer">
@@ -545,25 +638,34 @@ function SignInBar({ onOtherWays }: { onOtherWays: (() => void) | null }) {
   );
 }
 
+const FORWARD = new Set<ActionOption["func"]>(["ClaimQuest", "SubmitWork", "ApproveWork", "ClaimPayout", "ReleaseQuest"]);
+
 function ActionItem({
   q,
   o,
   walletReady,
   request,
-  onDone,
+  locked,
+  hooks,
 }: {
   q: Quest;
   o: ActionOption;
   walletReady: boolean;
   request: number;
-  onDone: (hash: string, block: bigint | null) => void;
+  locked: boolean;
+  hooks: TxHooks;
 }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  // The work link is the builder's job, so its field shows at once; the reason shows after "Reject the work".
+  const [revealed, setRevealed] = useState(o.input === "link");
   const body = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const problem = o.input === "link" ? checkLink(input) : o.input === "reason" ? checkReason(input) : null;
   const notConnected = o.blocked === NOT_CONNECTED;
   const disabled = o.blocked !== null && !notConnected;
+  const spec = { func: o.func, args: argsFor(o.func, q.id, input), questId: q.id, label: o.label, problem: o.input ? problem : null };
+  const tx = useTx(spec, hooks);
   // Opened from the sign-in bar: open this action's panel and move focus into it.
   useEffect(() => {
     if (request > 0) setOpen(true);
@@ -571,55 +673,137 @@ function ActionItem({
   useEffect(() => {
     if (request > 0 && open) body.current?.focus();
   }, [request, open]);
-  return (
-    <li className={`action ${disabled ? "blocked" : ""} ${open ? "is-open" : ""}`}>
-      <div className="action-row">
-        <div>
-          <div className="action-title">
-            <strong>{o.label}</strong> <span className="muted small">{o.who}</span>
-          </div>
-          <p className="action-explain">{o.explain}</p>
-          {o.blocked && !notConnected && <p className="action-blocked small">{o.blocked}</p>}
-        </div>
-        {!walletReady && !disabled ? (
-          // No wallet ready: the bar above holds the wallet button; each action keeps one consistent secondary control.
+  const text = (
+    <div>
+      <div className="action-title">
+        <strong>{o.label}</strong> <span className="muted small">{o.who}</span>
+      </div>
+      <p className="action-explain">{o.explain}</p>
+      {o.blocked && !notConnected && <p className="action-blocked small">{o.blocked}</p>}
+    </div>
+  );
+  const inputField =
+    o.input === "link" ? (
+      <input
+        ref={field}
+        className="input mono"
+        type="url"
+        name="work-link"
+        autoComplete="off"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder="https://"
+        spellCheck={false}
+      />
+    ) : o.input === "reason" ? (
+      <textarea ref={field} className="input" name="reject-reason" rows={3} value={input} onChange={(e) => setInput(e.target.value)} />
+    ) : null;
+  const fieldLabel = o.input === "link" ? "Link to the work" : "Reason for rejecting";
+  const fieldHint =
+    o.input === "link" ? `Starts with https://, at most ${rules.maxLinkLen} characters.` : `Shown publicly on the quest. At most ${rules.maxReasonLen} characters.`;
+
+  if (!walletReady && !disabled)
+    // No wallet ready: the bar above holds the wallet button; each action keeps one consistent secondary control.
+    return (
+      <li className={`action ${open ? "is-open" : ""}`}>
+        <div className="action-row">
+          {text}
           <div className="action-buttons">
             <button className="btn btn-subtle" aria-expanded={open} onClick={() => setOpen(!open)}>
               {open ? "Hide" : "Other ways to sign"}
             </button>
           </div>
-        ) : (
+        </div>
+        {open && (
+          <div className="action-body" ref={body} tabIndex={-1} aria-label={`${o.label}: how to sign`}>
+            {o.func === "ClaimQuest" && <PosterNote address={q.poster} />}
+            {inputField && (
+              <Field label={fieldLabel} hint={fieldHint} error={input ? problem : null}>
+                {inputField}
+              </Field>
+            )}
+            <TxPanel fallbackOpen spec={spec} hooks={hooks} showSent={false} />
+          </div>
+        )}
+      </li>
+    );
+
+  // Wallet ready (or the action is blocked): one real button, labelled with the action itself.
+  // After a transaction the page has not seen yet ("slow"), the same button stays off: pressing it again would send a second one.
+  const busy = tx.busy || locked || tx.phase === "slow";
+  const sign = () => void tx.sign();
+  const buttonText = tx.phase === "wallet" ? "Waiting for Adena…" : o.label;
+  const withField = !disabled && !!inputField && revealed;
+  // Moves that take the quest forward are the strong button; stepping back or stopping is the quieter one.
+  const strong = disabled ? "btn" : FORWARD.has(o.func) ? "btn btn-primary" : "btn btn-subtle";
+  return (
+    <li className={`action ${disabled ? "blocked" : ""}`} data-action={o.func}>
+      <div className="action-row">
+        {text}
+        {!withField && (
           <div className="action-buttons">
-            <button className="btn" aria-expanded={open} onClick={() => setOpen(!open)} disabled={disabled}>
-              {open ? "Hide" : "Do this"}
+            <button
+              className={strong}
+              disabled={disabled || busy}
+              onClick={
+                inputField
+                  ? () => {
+                      setRevealed(true);
+                      requestAnimationFrame(() => field.current?.focus());
+                    }
+                  : sign
+              }
+            >
+              {buttonText}
             </button>
           </div>
         )}
       </div>
-      {open && (
-        <div className="action-body" ref={body} tabIndex={-1} aria-label={`${o.label}: how to sign`}>
-          {o.func === "ClaimQuest" && <PosterNote address={q.poster} />}
-          {o.input === "link" && (
-            <Field label="Link to the work" hint={`Starts with https://, at most ${rules.maxLinkLen} characters.`} error={input ? problem : null}>
-              <input className="input mono" type="url" name="work-link" autoComplete="off" value={input} onChange={(e) => setInput(e.target.value)} placeholder="https://" spellCheck={false} />
-            </Field>
-          )}
-          {o.input === "reason" && (
-            <Field label="Reason for rejecting" hint={`Shown publicly on the quest. At most ${rules.maxReasonLen} characters.`} error={input ? problem : null}>
-              <textarea className="input" name="reject-reason" rows={3} value={input} onChange={(e) => setInput(e.target.value)} />
-            </Field>
-          )}
-          <TxPanel
-            fallbackOpen={!walletReady}
-            spec={{ func: o.func, args: argsFor(o.func, q.id, input), questId: q.id, label: o.label, problem: o.input ? problem : null }}
-            onDone={(hash, block) => {
-              setOpen(false);
-              onDone(hash, block);
-            }}
-          />
+      {!disabled && o.func === "ClaimQuest" && <PosterNote address={q.poster} />}
+      {withField && (
+        <InlineField label={fieldLabel} hint={fieldHint} error={input ? problem : null}>
+          {inputField}
+          <button className={strong} disabled={busy || !!problem} onClick={sign}>
+            {buttonText}
+          </button>
+        </InlineField>
+      )}
+      {!disabled && (
+        <div className="action-status">
+          <TxStatus tx={tx} showSent={false} />
+          <TxFallback spec={spec} />
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * A labelled control with its submit button: beside the control on wide
+ * screens, after the hint and error on phones. Hint and error are linked
+ * with aria-describedby.
+ */
+function InlineField({ label, hint, error, children }: { label: string; hint: string; error: string | null; children: [React.ReactElement<Record<string, unknown>>, ReactNode] }) {
+  const id = useId();
+  const hintId = `${id}-hint`;
+  const errorId = error ? `${id}-error` : undefined;
+  const [control, button] = children;
+  return (
+    <div className="field action-input">
+      <label className="field-label" htmlFor={id}>
+        {label}
+      </label>
+      {cloneElement(control, { id, "aria-describedby": [hintId, errorId].filter(Boolean).join(" "), "aria-invalid": error ? true : undefined })}
+      <span className="field-hint" id={hintId}>
+        {hint}
+      </span>
+      {error && (
+        <span className="field-error" id={errorId}>
+          {error}
+        </span>
+      )}
+      <div className="action-input-button">{button}</div>
+    </div>
   );
 }
 
@@ -684,7 +868,16 @@ export function Post() {
   const [reward, setReward] = useState("5");
   const [amount, setAmount] = useState("1");
   const [unit, setUnit] = useState<WindowUnit>("days");
-  const [posted, setPosted] = useState<{ hash: string; block: bigint | null } | null>(null);
+  const w = useWallet();
+  const [posted, setPosted] = useState<{ hash: string; block: bigint | null; id: bigint | null } | null>(null);
+  const startHeight = useRef<Promise<bigint> | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const blocks = windowToBlocks(Number(amount), unit);
   const r = checkReward(reward);
@@ -695,6 +888,30 @@ export function Post() {
     window: !Number.isFinite(Number(amount)) || Number(amount) <= 0 ? "Choose how long the builder has." : checkWorkBlocks(blocks),
   };
   const firstError = errs.title ?? errs.details ?? errs.reward ?? errs.window;
+
+  // After posting: find the new quest among the poster's newest ones, so the result links straight to it.
+  const hooks: TxHooks = {
+    onStart: () => {
+      startHeight.current = read.height({ maxAgeMs: 0 }).catch(() => 0n);
+    },
+    onSent: async (hash, block) => {
+      const poster = w.address;
+      if (!poster || r.ugnot === null) return "timeout";
+      const want = { poster, title, details, reward: r.ugnot, minHeight: block ?? (await (startHeight.current ?? Promise.resolve(0n))) };
+      const find = async () => findPosted(await read.quests(await read.posterIds(poster, 0, 5, { maxAgeMs: 0 }), { maxAgeMs: 0 }), want);
+      const cancelled = () => !mounted.current;
+      const id = await waitFor(find, { cancelled });
+      if (!mounted.current) return "timeout";
+      setPosted({ hash, block, id });
+      if (id === null) {
+        // Not there yet: keep looking quietly at the normal pace for two more minutes.
+        void waitFor(find, { intervalMs: QUEST_POLL_MS, timeoutMs: 120_000, cancelled }).then(
+          (later) => later !== null && mounted.current && setPosted((p) => (p && p.hash === hash ? { ...p, id: later } : p)),
+        );
+      }
+      return id !== null ? "updated" : "timeout";
+    },
+  };
 
   return (
     <section className="post">
@@ -774,16 +991,28 @@ export function Post() {
 
         <div className="post-submit">
           {posted ? (
-            <>
+            <div className="posted" data-posted>
               <TxSent hash={posted.hash} block={posted.block} what="your quest" />
-              <p>
-                It appears on the board once the block is in. <a href="#/">Go to the board</a>
-              </p>
-            </>
+              {posted.id !== null ? (
+                <p className="posted-next">
+                  <span>Quest {posted.id.toString()} is on the board.</span>
+                  <a className="btn btn-primary" href={`#/quest/${posted.id}`}>
+                    Open quest {posted.id.toString()}
+                  </a>
+                </p>
+              ) : (
+                <p className="posted-next">
+                  <span className="wallet-wait" role="status">
+                    <span className="spinner" aria-hidden="true" /> The transaction went through. The link to your quest appears here as soon as the network has it.
+                  </span>
+                  <a href="#/mine">My quests</a>
+                </p>
+              )}
+            </div>
           ) : (
             <TxPanel
               spec={{ func: "PostQuest", args: [title, details, String(blocks)], sendUgnot: r.ugnot ?? undefined, label: "Post and lock the reward", problem: firstError }}
-              onDone={(hash, block) => setPosted({ hash, block })}
+              hooks={hooks}
             />
           )}
         </div>
