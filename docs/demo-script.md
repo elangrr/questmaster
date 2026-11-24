@@ -23,12 +23,12 @@ the wait out afterwards.
 
 | Time | On screen | Do | Say |
 |---|---|---|---|
-| 0:00 | Board home page | Scroll slowly from the title to the totals line and the quests. | "This is QuestMaster, a bounty board on Gno.land. You post a small task and lock the reward in GNOT. A builder does the work, and the realm pays them when you approve. It runs on the Onyx testnet with test GNOT." |
+| 0:00 | Board home page | Scroll slowly from the hero and escrow diagram to the totals bar below it and the open quests. | "This is QuestMaster, a bounty board on Gno.land. You post a small task and lock the reward in GNOT. A builder does the work, and the realm pays them when you approve. It runs on the Onyx testnet with test GNOT." |
 | 0:20 | Home page, "Post a quest" links | Switch Adena to **Poster**. Click "5 GNOT". | "Let's post a quest with a 5 GNOT reward." |
 | 0:25 | gnoweb form for PostQuest | Type the title and details, work window `20000`. Turn on the switch that adds the 5 GNOT. Sign in Adena. | "The form already holds the reward. I confirm sending it, fill in the task, and sign. The 5 GNOT is now locked in the realm, not with me and not with anyone else." |
-| 0:45 | Home page | Reload; point at the new row and "GNOT locked" in the totals line. | "The quest is open, and the board shows the locked reward." |
+| 0:45 | Home page | Reload; point at the new row and "GNOT locked" in the totals bar below the hero. | "The quest is open, and the board shows the locked reward." |
 | 0:50 | Quest page | Open the quest. Point at "What can happen next". | "Every quest page shows only the moves that are possible now, and who may make them." |
-| 0:55 | Quest page | Switch Adena to **Builder**. On "Take this quest", click **Do this**, then **Take this quest**, and sign in Adena. | "Now I'm the builder. I take the quest. The work window starts now." |
+| 0:55 | Quest page | Switch Adena to **Builder** (connect if needed). On "Take this quest", click **Do this**, then **Take this quest**, and sign in Adena. | "Now I'm the builder. I take the quest. The work window starts now." |
 | 1:05 | Quest page | Reload. Click "Open in gnoweb" next to Submit work, paste the link, sign. | "I've done the work, so I submit a link to it." |
 | 1:15 | Quest page | Reload. Point at State "Submitted" and the review deadline. | "The poster now has about 7 days to approve or reject. If they never answer, the builder can claim the reward after that, so the board warns posters to check their quests." |
 | 1:20 | Quest page | Switch Adena to **Poster**. Click Approve, sign. | "Back as the poster. The work is good, so I approve." |
@@ -73,7 +73,7 @@ tabs on screen.
 | 0:10 | Terminal | The agent calls `gno_render` on the realm; the board's Markdown scrolls by. | "It reads the realm straight from the chain. No key, no cost." |
 | 0:20 | Terminal | The agent answers with the open quests sorted by reward. | "Open quests, highest reward first." |
 | 0:27 | Terminal | Type: "Eval GetQuest on the top one and tell me how long the builder has." The agent calls `gno_eval`. | "Exact values come from eval." |
-| 0:35 | Web app | Open the same quest; show the stepper and the deadline bar. | "Same quest, same numbers, in the web app." |
+| 0:35 | Web app | Open the same quest; show the escrow strip, the stepper and the facts panel (work window, or the deadline bar once taken or submitted). | "Same quest, same numbers, in the web app." |
 | 0:40 | Web app | Hold on the quest page. | "QuestMaster: small tasks, paid in GNOT. Testnet only." |
 
 Do not show or run any write in this clip (`gno_call`, keys, faucet,

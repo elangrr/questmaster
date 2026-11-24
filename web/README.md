@@ -179,15 +179,19 @@ theme anchored by a single cobalt accent. The app bundles local Latin
 (Copyright (c) 2017 IBM Corp., see `NOTICE`); no fonts are fetched from any
 CDN or third-party host.
 Visuals are inline SVG in `src/ui/visuals.tsx` (the escrow mark, the
-quest-flow diagram, the quest stepper, deadline bars, skeletons, small
-illustrations); motion helpers are in `src/ui/motion.ts`. There is no
-animation library.
+quest-flow diagram on tablet and desktop, the quest stepper, deadline bars in
+the quest facts panel, skeletons, and architectural line illustrations);
+motion helpers are in `src/ui/motion.ts`. There is no animation library.
+Quest pages pair an escrow status strip with a sticky facts panel on desktop;
+the Post page uses a two-column composer and escrow receipt layout on wide
+screens; narrow headers place the testnet badge in a compact strip above the
+brand row and show edge fades when the link strip scrolls.
 
 - Under `prefers-reduced-motion: reduce` every animation and transition
-  settles at once: the diagram is shown in its final state and totals appear
-  without counting.
-- The hero diagram loops quietly and pauses when it is off-screen or the tab
-  is hidden.
+  settles at once and the diagram is shown in its final state.
+- The hero diagram loops quietly on screens 700 px and wider (omitted on
+  phones), includes a pause toggle, and pauses when off-screen or when the
+  tab is hidden.
 - Loaders are skeletons the same size as what replaces them, so content does
   not jump.
 

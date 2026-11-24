@@ -33,15 +33,17 @@ transaction link the app showed.
 - [ ] The header label says "Onyx testnet · test GNOT".
 
 **Posting (as Poster)**
-- [ ] Open **Post**. The yellow warning about the 7-day review window is there.
+- [ ] Open **Post**. The "What leaves your wallet" cost card and the amber
+      warning about the 7-day review window sit in the right column on wide
+      screens (and below the form, above the sign button, on phones).
 - [ ] Type an 81-character title: the error shows and the button is disabled.
-- [ ] Fill a real title, details, reward 2, work window 1 day. The box shows
-      what leaves your wallet (reward, storage deposit, fee).
+- [ ] Fill a real title, details, reward 2, work window 1 day. The "What leaves
+      your wallet" card updates with the reward, storage deposit and fee.
 - [ ] Click **Post and lock the reward**, check Adena shows a call to
       `PostQuest` with 2 GNOT sent, and sign.
 - [ ] The app shows "Sent: your quest" with a GnoScan link that opens.
-- [ ] On the board the quest appears with 2 GNOT; the totals line under the
-      heading shows 2 more GNOT locked and one more open quest.
+- [ ] On the board the quest appears with 2 GNOT; the totals bar below the hero
+      shows 2 more GNOT locked and one more open quest.
 
 **Claiming and submitting (as Builder)**
 - [ ] Switch Adena to Builder. Open the quest. "Take this quest" is enabled;
@@ -54,7 +56,8 @@ transaction link the app showed.
 - [ ] Switch to Poster. The quest shows the review warning and the review
       deadline (about 7 days).
 - [ ] Try **Take this quest** on your own open quest (post another one first):
-      the button says "You posted this quest".
+      its **Do this** button is disabled and the line under it says "You posted
+      this quest; someone else must take it."
 - [ ] On the submitted quest, click **Approve and pay**, sign.
 - [ ] Builder's balance went up by exactly 2 GNOT (Adena, or GnoScan).
       The quest shows "Paid" and appears on the **Paid** page.
@@ -63,8 +66,9 @@ transaction link the app showed.
 - [ ] Post a quest, take it as Builder, submit, then as Poster **Reject** with a
       reason that has a line break. The quest is Open again, "Times rejected 1",
       and the reason shows with its line break.
-- [ ] Take it again as Builder. As Poster, **Close quest**: the quest shows
-      "· closing" and the note "The reward returns to the poster…".
+- [ ] Take it again as Builder. As Poster, **Close quest**: the state badge
+      shows "In progress · closing" and the closing note says "Closing. The
+      reward returns to the poster…".
 - [ ] As Builder, **Give the quest back**: the quest becomes Cancelled and the
       Poster gets the reward back.
 - [ ] Post one more and **Cancel** it while open: refund arrives at once.
@@ -77,7 +81,8 @@ transaction link the app showed.
 **Looks**
 - [ ] On a phone (or a narrow window), the board, a quest and the post form are
       readable without sideways scrolling.
-- [ ] The moon/sun button switches light and dark.
+- [ ] The theme button in the header cycles through system (auto), light (sun)
+      and dark (moon).
 - [ ] The footer shows "Built on gno.land", the source link, the realm path and
       "Not an official Gno.land product. Testnet only".
 
