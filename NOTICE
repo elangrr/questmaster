@@ -1,8 +1,8 @@
 QuestMaster
-Copyright 2026 Fluxen
+Copyright (c) 2026 Fluxen
 
-This product is licensed under the Apache License, Version 2.0 (see LICENSE).
-That licence covers only the code written for QuestMaster in this repository.
+QuestMaster is licensed under the MIT License (see LICENSE); that licence
+covers only the code written for QuestMaster in this repository.
 
 The copy of QuestMaster published on the Gno.land network is, in addition,
 made available under the GNO Network General Public License, version 6,
@@ -17,7 +17,7 @@ QuestMaster imports the following packages on chain. They are not copied into
 this repository; they are deployed on Gno.land and imported from the chain.
 They come from github.com/gnolang/gno and remain under their own licence, the
 GNO Network General Public License, version 6, including its attribution
-terms. QuestMaster's Apache 2.0 licence does not relicense them.
+terms. QuestMaster's MIT License does not relicense them.
 
   - gno.land/p/nt/avl/v0              (sorted tree used for storage)
   - gno.land/p/moul/txlink/v0         (gnoweb transaction links)

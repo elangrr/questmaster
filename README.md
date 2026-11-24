@@ -363,7 +363,7 @@ scripts/local-flow.sh     full flow on a local node
 scripts/set-namespace.sh  replace the placeholder namespace before deploying
 web/                      the web app (static site, Adena wallet)
 docs/                     plan, deployment steps, demo script, Gno notes, AI-agent guide
-LICENSE, NOTICE            Apache License 2.0 for QuestMaster's own code; third-party notice
+LICENSE, NOTICE            MIT License for QuestMaster's own code; third-party notice
 ```
 
 Events on every change, for indexers: `QuestPosted`, `QuestClaimed`, `QuestUnclaimed`, `QuestReleased`, `WorkSubmitted`, `WorkRejected`, `QuestPaid` (with `how` = approved or timeout), `QuestClosing`, `QuestCancelled` (with `how` = open, unclaimed, released or rejected).
@@ -379,7 +379,7 @@ Any of these needs a new version, deployed at new paths ending in `/v2` (`gno.la
 
 ## Licence and credits
 
-QuestMaster's own code in this repository is licensed under the **Apache License, Version 2.0** (see `LICENSE` and `NOTICE`). Copyright 2026 Fluxen.
+QuestMaster's own code in this repository is licensed under the **MIT License** (see `LICENSE` and `NOTICE`). Copyright (c) 2026 Fluxen.
 
 The copy published on the Gno.land network is, in addition, made available under the **GNO Network General Public License, version 6**, including its Additional Terms on Strong Attribution: the network's terms of use (Network Interaction Terms, section 5, `TERMS.md` in github.com/gnolang/gno) say that any code published for execution on the network is made available under that licence. The "Built on gno.land" link on every page is that attribution.
 

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "Web app for QuestMaster, a GNOT bounty board on the Onyx test network.",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

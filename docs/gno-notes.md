@@ -205,7 +205,11 @@ Other facts:
   to copy and distribute verbatim copies" sentence, but its section "How to Apply These Terms to Your New Programs"
   invites other authors to license their programs under it. This is our reading, not legal advice, kept as
   background.
-- **Licence decision (2026-11-23):** the owner, as copyright holder, chose the Apache License 2.0 for QuestMaster's
+- **Licence decision (2026-11-24):** the owner, as copyright holder, chose the MIT License for QuestMaster's own code
+  (`LICENSE`, `NOTICE`), replacing the Apache License 2.0 chosen on 2026-11-23. Like before, it covers only the code
+  in this repository; the imported packages and the Gno standard library keep their own licence, and the on-chain
+  copy is also under the GNO Network GPL v6 (below). The earlier history stays as background:
+- **Earlier licence decision (2026-11-23):** the owner, as copyright holder, chose the Apache License 2.0 for QuestMaster's
   own code (`LICENSE`, `NOTICE`). It covers only the code in this repository. The imported packages above and the
   Gno standard library stay under the GNO Network General Public License v6 and its attribution terms; NOTICE and
   the README say so, and the pages keep "Built on gno.land". Before this, from task 4 until this change, the repo's
@@ -213,7 +217,7 @@ Other facts:
 - **On-chain copy (our reading, not legal advice):** the Network Interaction Terms (`TERMS.md` in gnolang/gno, section
   5) say "Any code or other copyrightable work you publish for execution on the Network is made available under the
   GNO Network General Public License, version 6 … including its Additional Terms on Strong Attribution". So the copy of
-  QuestMaster published on Onyx is also under that licence, alongside Apache 2.0 for the repository. README and
+  QuestMaster published on Onyx is also under that licence, alongside the repository's licence (MIT since 2026-11-24). README and
   NOTICE say both. Section 5 also requires accepting the CLA when publishing packages; CLA enforcement is disabled on
   Onyx today (see the Onyx facts).
 
