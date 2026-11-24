@@ -159,22 +159,39 @@ export function notLiveMessage(s: PackageStatus | null): string {
 // --- small cache: identical reads within a few seconds share one request ---
 
 const TTL_MS = 4_000;
-const cache = new Map<string, { at: number; value: Promise<unknown> }>();
+const cache = new Map<string, { at: number; value: Promise<unknown>; settled: boolean }>();
 
-function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+/** Options for one read. maxAgeMs: reuse a finished identical read only if it started this recently (default 4 s). */
+export interface ReadOpts {
+  maxAgeMs?: number;
+}
+
+/**
+ * An identical read still in flight (started less than 4 s ago) is always
+ * shared. A finished one is reused while it is younger than maxAgeMs, so a
+ * page that polls can ask for a fresh answer (a small maxAgeMs) without
+ * sending duplicate requests.
+ */
+function cached<T>(key: string, load: () => Promise<T>, o?: ReadOpts): Promise<T> {
   const hit = cache.get(key);
   const now = Date.now();
-  if (hit && now - hit.at < TTL_MS) return hit.value as Promise<T>;
+  const maxAge = o?.maxAgeMs ?? TTL_MS;
+  if (hit && now - hit.at < (hit.settled ? Math.min(maxAge, TTL_MS) : TTL_MS)) return hit.value as Promise<T>;
   const value = load();
-  cache.set(key, { at: now, value });
-  // Never cache failures. Only drop this read's own entry: a slow failure must not evict a newer read.
-  value.catch(() => {
-    if (cache.get(key)?.value === value) cache.delete(key);
-  });
+  const entry = { at: now, value: value as Promise<unknown>, settled: false };
+  cache.set(key, entry);
+  value.then(
+    () => void (entry.settled = true),
+    () => {
+      entry.settled = true;
+      // Never cache failures. Only drop this read's own entry: a slow failure must not evict a newer read.
+      if (cache.get(key) === entry) cache.delete(key);
+    },
+  );
   return value;
 }
 
-/** Forget cached reads (after a transaction). */
+/** Forget cached reads (after a transaction). Reads in flight are forgotten too, so the next read starts afresh. */
 export function invalidate(): void {
   cache.clear();
 }
@@ -185,21 +202,21 @@ function addr(a: string): string {
 }
 
 export const read = {
-  totals: (): Promise<Totals> => cached("totals", async () => decodeTotals(await evalJson("GetTotals()"))),
-  quest: (id: bigint): Promise<Quest> => cached(`q${id}`, async () => decodeQuest(await evalJson(`GetQuest(${id})`))),
-  openIds: (offset: number, limit: number) =>
-    cached(`open${offset}/${limit}`, async () => decodeIds(await evalJson(`OpenQuestIDs(${offset}, ${limit})`))),
-  paidIds: (offset: number, limit: number) =>
-    cached(`paid${offset}/${limit}`, async () => decodeIds(await evalJson(`PaidQuestIDs(${offset}, ${limit})`))),
-  posterIds: (a: string, offset: number, limit: number) =>
-    cached(`p${a}${offset}/${limit}`, async () => decodeIds(await evalJson(`QuestIDsByPoster(${addr(a)}, ${offset}, ${limit})`))),
-  builderIds: (a: string, offset: number, limit: number) =>
-    cached(`b${a}${offset}/${limit}`, async () => decodeIds(await evalJson(`QuestIDsByBuilder(${addr(a)}, ${offset}, ${limit})`))),
-  posterCount: (a: string) => cached(`pc${a}`, async () => decodeInt(await evalJson(`CountByPoster(${addr(a)})`))),
-  builderCount: (a: string) => cached(`bc${a}`, async () => decodeInt(await evalJson(`CountByBuilder(${addr(a)})`))),
+  totals: (o?: ReadOpts): Promise<Totals> => cached("totals", async () => decodeTotals(await evalJson("GetTotals()")), o),
+  quest: (id: bigint, o?: ReadOpts): Promise<Quest> => cached(`q${id}`, async () => decodeQuest(await evalJson(`GetQuest(${id})`)), o),
+  openIds: (offset: number, limit: number, o?: ReadOpts) =>
+    cached(`open${offset}/${limit}`, async () => decodeIds(await evalJson(`OpenQuestIDs(${offset}, ${limit})`)), o),
+  paidIds: (offset: number, limit: number, o?: ReadOpts) =>
+    cached(`paid${offset}/${limit}`, async () => decodeIds(await evalJson(`PaidQuestIDs(${offset}, ${limit})`)), o),
+  posterIds: (a: string, offset: number, limit: number, o?: ReadOpts) =>
+    cached(`p${a}${offset}/${limit}`, async () => decodeIds(await evalJson(`QuestIDsByPoster(${addr(a)}, ${offset}, ${limit})`)), o),
+  builderIds: (a: string, offset: number, limit: number, o?: ReadOpts) =>
+    cached(`b${a}${offset}/${limit}`, async () => decodeIds(await evalJson(`QuestIDsByBuilder(${addr(a)}, ${offset}, ${limit})`)), o),
+  posterCount: (a: string, o?: ReadOpts) => cached(`pc${a}`, async () => decodeInt(await evalJson(`CountByPoster(${addr(a)})`)), o),
+  builderCount: (a: string, o?: ReadOpts) => cached(`bc${a}`, async () => decodeInt(await evalJson(`CountByBuilder(${addr(a)})`)), o),
   /** Many quests in parallel, keeping order. */
-  quests: (ids: bigint[]): Promise<Quest[]> => Promise.all(ids.map((id) => read.quest(id))),
-  height: (): Promise<bigint> =>
+  quests: (ids: bigint[], o?: ReadOpts): Promise<Quest[]> => Promise.all(ids.map((id) => read.quest(id, o))),
+  height: (o?: ReadOpts): Promise<bigint> =>
     cached("height", async () => {
       const j = await withTimeout(async (signal) => {
         let res: Response;
@@ -214,5 +231,5 @@ export const read = {
       const h = j?.result?.sync_info?.latest_block_height;
       if (typeof h !== "string" || !/^\d+$/.test(h)) throw new ReadError("network", "The node did not report its block height.");
       return BigInt(h);
-    }),
+    }, o),
 };

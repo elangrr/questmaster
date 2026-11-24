@@ -5,6 +5,17 @@
 //   On("changedAccount" | "changedNetwork", cb).
 // Responses: { code, status: "success" | "failure", type, message, data }.
 // DoContract takes no gas fields: Adena estimates the fee and shows it.
+//
+// Restoring a connection after a page load (checked against the Adena source,
+// packages/adena-extension/src/inject/message/message-handler.ts and
+// inject/message/methods/{common,wallet}.ts): GetAccount never opens a popup
+// (GET_ACCOUNT is in NON_POPUP_REQUEST_TYPES and its handler only answers).
+// For a site the user has not connected it fails with NOT_CONNECTED; for a
+// connected site with the wallet locked it fails with WALLET_LOCKED; with no
+// account in the wallet, NO_ACCOUNT. AddEstablish is the call that opens a
+// popup, so a restore uses GetAccount only.
+// On(event, cb) adds a window listener and returns true; there is no way to
+// remove it, so listeners must be registered once per page.
 
 import { config } from "../config";
 import type { MsgCall } from "./actions";
@@ -107,6 +118,79 @@ export async function account(): Promise<Account> {
   const d = r.data ?? ({} as any);
   if (typeof d.address !== "string" || !/^g1[02-9ac-hj-np-z]{38}$/.test(d.address)) throw new WalletError("failed", "Adena returned no address.");
   return { address: d.address, chainId: String(d.chainId ?? "") };
+}
+
+export type RestoreResult = { status: "connected"; account: Account } | { status: "not-connected" | "locked" | "unavailable" };
+
+/** How long a silent restore waits for Adena to answer GetAccount. */
+export const RESTORE_TIMEOUT_MS = 4_000;
+
+/**
+ * Asks Adena for the account without any popup (GetAccount only). Used on
+ * page load when this browser connected before. Never throws.
+ *  - connected: the site is still connected and the wallet is unlocked;
+ *  - not-connected: Adena no longer has this site (or has no account): forget it;
+ *  - locked: the wallet is locked: stay disconnected, try again on the next load;
+ *  - unavailable: no Adena, no answer in time, or an unexpected reply.
+ */
+export async function restoreAccount(timeoutMs = RESTORE_TIMEOUT_MS): Promise<RestoreResult> {
+  const a = getAdena();
+  if (!a) return { status: "unavailable" };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const r = await Promise.race([
+      a.GetAccount(),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+    if (!r) return { status: "unavailable" };
+    if (r.status !== "success") {
+      if (r.type === "NOT_CONNECTED" || r.type === "NO_ACCOUNT") return { status: "not-connected" };
+      if (r.type === "WALLET_LOCKED") return { status: "locked" };
+      return { status: "unavailable" };
+    }
+    const d = r.data ?? ({} as any);
+    if (typeof d.address !== "string" || !/^g1[02-9ac-hj-np-z]{38}$/.test(d.address)) return { status: "unavailable" };
+    return { status: "connected", account: { address: d.address, chainId: String(d.chainId ?? "") } };
+  } catch {
+    return { status: "unavailable" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---- remembering that this browser connected (a flag only; never a key or an address)
+
+export const REMEMBER_KEY = "qm-wallet-connected";
+
+type FlagStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+function localStore(): FlagStorage | null {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null; // private mode or blocked storage
+  }
+}
+
+/** Remember (or forget) that the user connected Adena here. Silent when storage is unavailable. */
+export function rememberConnection(on: boolean, storage: FlagStorage | null = localStore()): void {
+  try {
+    if (on) storage?.setItem(REMEMBER_KEY, "1");
+    else storage?.removeItem(REMEMBER_KEY);
+  } catch {
+    /* not remembered: the user connects again next time */
+  }
+}
+
+/** True when the user connected here before and did not disconnect. */
+export function wasConnected(storage: FlagStorage | null = localStore()): boolean {
+  try {
+    return storage?.getItem(REMEMBER_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 /** Switch Adena to the app's network, adding it first if Adena does not know it. */

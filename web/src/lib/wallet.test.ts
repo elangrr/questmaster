@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { config } from "../config";
 import { actionsFor, argsFor, buildMsg, gnokeyCommand, gnowebActionLink, type ActionName } from "./actions";
 import { decodeQuest } from "./amino";
 import fx from "../__fixtures__/gnodev-qeval-json.json";
-import { connect, send, switchNetwork, WalletError, chainErrorText } from "./wallet";
+import { chainErrorText, connect, REMEMBER_KEY, rememberConnection, restoreAccount, send, switchNetwork, wasConnected, WalletError } from "./wallet";
 
 const POSTER = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const BUILDER = "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj";
@@ -187,5 +187,95 @@ describe("which actions show, for whom", () => {
   it("arguments", () => {
     expect(argsFor("SubmitWork", 7n, "https://x.io")).toEqual(["7", "https://x.io"]);
     expect(argsFor("ApproveWork", 7n)).toEqual(["7"]);
+  });
+});
+
+describe("restoring a connection after a reload (no popup)", () => {
+  const fail = (type: string) => ({ code: 1000, status: "failure", type, message: "", data: {} });
+  function adenaWith(getAccount: () => Promise<any>) {
+    const calls: string[] = [];
+    (globalThis as any).adena = {
+      AddEstablish: async () => (calls.push("AddEstablish"), { status: "success" }),
+      GetAccount: async () => (calls.push("GetAccount"), getAccount()),
+      DoContract: async () => (calls.push("DoContract"), { status: "success" }),
+      SwitchNetwork: async () => (calls.push("SwitchNetwork"), { status: "success" }),
+      AddNetwork: async () => (calls.push("AddNetwork"), { status: "success" }),
+    };
+    return calls;
+  }
+
+  it("a connected site: the account, from GetAccount alone", async () => {
+    const calls = adenaWith(async () => ({ status: "success", type: "GET_ACCOUNT_SUCCESS", data: { address: BUILDER, chainId: "dev" } }));
+    expect(await restoreAccount()).toEqual({ status: "connected", account: { address: BUILDER, chainId: "dev" } });
+    expect(calls).toEqual(["GetAccount"]);
+  });
+
+  it("a site Adena does not know: not-connected (forget it)", async () => {
+    adenaWith(async () => fail("NOT_CONNECTED"));
+    expect(await restoreAccount()).toEqual({ status: "not-connected" });
+    adenaWith(async () => fail("NO_ACCOUNT"));
+    expect(await restoreAccount()).toEqual({ status: "not-connected" });
+  });
+
+  it("a locked wallet: locked (stay disconnected, try again next time)", async () => {
+    const calls = adenaWith(async () => fail("WALLET_LOCKED"));
+    expect(await restoreAccount()).toEqual({ status: "locked" });
+    expect(calls).toEqual(["GetAccount"]);
+  });
+
+  it("no Adena, an odd answer, a throw or no answer in time: unavailable", async () => {
+    expect(await restoreAccount()).toEqual({ status: "unavailable" });
+    adenaWith(async () => ({ status: "success", data: { address: "nope" } }));
+    expect(await restoreAccount()).toEqual({ status: "unavailable" });
+    adenaWith(async () => fail("UNRESOLVED_TRANSACTION_EXISTS"));
+    expect(await restoreAccount()).toEqual({ status: "unavailable" });
+    adenaWith(async () => {
+      throw new Error("extension reloaded");
+    });
+    expect(await restoreAccount()).toEqual({ status: "unavailable" });
+    vi.useFakeTimers();
+    try {
+      adenaWith(() => new Promise(() => {}));
+      const r = restoreAccount(4_000);
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect(await r).toEqual({ status: "unavailable" });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("remembering the connection", () => {
+  function memory() {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k), m };
+  }
+  it("stores only a flag, and forgets it on disconnect", () => {
+    const s = memory();
+    expect(wasConnected(s)).toBe(false);
+    rememberConnection(true, s);
+    expect(wasConnected(s)).toBe(true);
+    expect([...s.m]).toEqual([[REMEMBER_KEY, "1"]]);
+    rememberConnection(false, s);
+    expect(wasConnected(s)).toBe(false);
+    expect(s.m.size).toBe(0);
+  });
+  it("is silent when storage is missing or throws (private mode)", () => {
+    const broken = {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+      removeItem: () => {
+        throw new Error("SecurityError");
+      },
+    };
+    expect(() => rememberConnection(true, broken)).not.toThrow();
+    expect(wasConnected(broken)).toBe(false);
+    expect(() => rememberConnection(false, null)).not.toThrow();
+    expect(wasConnected(null)).toBe(false);
   });
 });

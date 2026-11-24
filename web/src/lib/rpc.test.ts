@@ -602,6 +602,61 @@ describe("read (realm reads through vm/qeval_json)", () => {
     });
   });
 
+  describe("fresh reads for polling (maxAgeMs)", () => {
+    it("a finished read older than maxAgeMs goes to the network again", async () => {
+      const now = vi.spyOn(Date, "now").mockReturnValue(2_000_000);
+      const f = useFetch(fixtureReply("GetTotals()"));
+      await read.totals();
+      now.mockReturnValue(2_001_500);
+      await read.totals(); // default: within 4 s, cached
+      expect(f.calls()).toBe(1);
+      await read.totals({ maxAgeMs: 1_000 }); // 1.5 s old: too old for a poll
+      expect(f.calls()).toBe(2);
+      now.mockReturnValue(2_002_000);
+      await read.totals({ maxAgeMs: 1_000 }); // 0.5 s old: shared
+      expect(f.calls()).toBe(2);
+    });
+
+    it("maxAgeMs 0 always reaches the network once the earlier read has finished", async () => {
+      const f = useFetch(fixtureReply("GetQuest(1)"));
+      await read.quest(1n);
+      await read.quest(1n, { maxAgeMs: 0 });
+      await read.quest(1n, { maxAgeMs: 0 });
+      expect(f.calls()).toBe(3);
+    });
+
+    it("identical reads in flight share one request, whatever their maxAgeMs", async () => {
+      let answer!: (r: Response) => void;
+      const f = useFetch(() => new Promise<Response>((r) => (answer = r)));
+      const a = read.quest(1n);
+      const b = read.quest(1n, { maxAgeMs: 0 });
+      const c = read.quest(1n, { maxAgeMs: 1_000 });
+      expect(f.calls()).toBe(1);
+      answer(fixtureReply("GetQuest(1)"));
+      const [qa, qb, qc] = await Promise.all([a, b, c]);
+      expect(qb).toBe(qa);
+      expect(qc).toBe(qa);
+    });
+
+    it("a read stuck in flight for 4 s or more is not shared", async () => {
+      vi.useFakeTimers();
+      const f = useFetch(() => new Promise<Response>(() => {}), fixtureReply("GetTotals()"));
+      const stuck = readError(read.totals());
+      await vi.advanceTimersByTimeAsync(4_000);
+      await read.totals({ maxAgeMs: 1_000 });
+      expect(f.calls()).toBe(2);
+      await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS);
+      await stuck;
+    });
+
+    it("every read takes the option, and quests() passes it on", async () => {
+      const f = useFetch(fixtureReply("GetQuest(1)"));
+      await read.quests([1n]);
+      await read.quests([1n], { maxAgeMs: 0 });
+      expect(f.calls()).toBe(2);
+    });
+  });
+
   describe("height (GET /status)", () => {
     const status = (h: unknown) => httpReply(200, { jsonrpc: "2.0", id: -1, result: { sync_info: { latest_block_height: h } } });
     const TIMEOUT_MSG = `The ${config.networkName} node at ${config.rpcUrl} did not answer in time. Try again in a moment.`;
