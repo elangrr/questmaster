@@ -101,9 +101,11 @@ export function TxPanel({ spec, onDone, note, fallbackOpen = false }: { spec: Tx
         </p>
       )}
       <WalletGate>
-        <button className="btn btn-primary" onClick={() => void sign()} disabled={busy || !!spec.problem}>
-          {busy ? "Waiting for Adena…" : spec.label}
-        </button>
+        <div className="tx-submit-row">
+          <button className="btn btn-primary" onClick={() => void sign()} disabled={busy || !!spec.problem}>
+            {busy ? "Waiting for Adena…" : spec.label}
+          </button>
+        </div>
         {spec.problem && <p className="field-error">{spec.problem}</p>}
       </WalletGate>
       {phase !== "idle" && <TxSteps phase={phase} block={block} />}
@@ -119,16 +121,20 @@ export function TxPanel({ spec, onDone, note, fallbackOpen = false }: { spec: Tx
           <Icon name="chevron" />
           No Adena? Use gnokey or gnoweb
         </summary>
-        <p className="muted">With gnokey (replace YOUR_KEY_NAME):</p>
-        <pre className="cmd">{cmd}</pre>
-        <CopyButton text={cmd} label="Copy command" />
-        <p className="muted">
-          Or open the{" "}
-          <a href={gnowebActionLink(spec.func, spec.questId, spec.sendUgnot)} target="_blank" rel="noopener noreferrer">
-            gnoweb form
-          </a>{" "}
-          {spec.args.length > 1 ? "and fill in the remaining fields." : "with the quest number filled in."}
-        </p>
+        <div className="fallback-body">
+          <div className="cmd-head">
+            <p className="muted small">With gnokey (replace YOUR_KEY_NAME):</p>
+            <CopyButton text={cmd} label="Copy command" />
+          </div>
+          <pre className="cmd">{cmd}</pre>
+          <p className="muted small">
+            Or open the{" "}
+            <a href={gnowebActionLink(spec.func, spec.questId, spec.sendUgnot)} target="_blank" rel="noopener noreferrer">
+              gnoweb form
+            </a>{" "}
+            {spec.args.length > 1 ? "and fill in the remaining fields." : "with the quest number filled in."}
+          </p>
+        </div>
       </details>
     </div>
   );
@@ -171,7 +177,13 @@ function TxSteps({ phase, block }: { phase: TxPhase; block: bigint | null }) {
         const text = st === "active" ? s.doing : s.key === "confirmed" && st === "done" && block !== null ? `Confirmed in block ${thousands(block)}` : s.label;
         return (
           <li key={s.key} className={`txstep ${st}`} aria-current={st === "active" ? "step" : undefined}>
-            {st === "active" ? <span className="spinner" aria-hidden="true" /> : <span className="txstep-dot" aria-hidden="true">{st === "done" ? <Icon name="check" /> : st === "failed" ? <Icon name="alert" /> : i + 1}</span>}
+            {st === "active" ? (
+              <span className="spinner" aria-hidden="true" />
+            ) : (
+              <span className="txstep-dot" aria-hidden="true">
+                {st === "done" ? <Icon name="check" /> : st === "failed" ? <Icon name="alert" /> : i + 1}
+              </span>
+            )}
             <span>{text}</span>
           </li>
         );

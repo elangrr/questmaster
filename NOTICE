@@ -27,4 +27,16 @@ terms. QuestMaster's MIT License does not relicense them.
 Source and licence: https://github.com/gnolang/gno (see LICENSE.md there)
 and https://gno.land/license.
 
+Web app fonts
+-------------
+
+The web app bundles Latin subsets of two open-licence typefaces as local
+woff2 files (web/src/assets/fonts/):
+
+  - IBM Plex Sans (weights 400, 500, 600, 700)
+  - IBM Plex Mono (weights 400, 500)
+
+Copyright (c) 2017 IBM Corp., licensed under the SIL Open Font License,
+Version 1.1 (https://github.com/IBM/plex/blob/master/LICENSE.txt).
+
 Built on gno.land (https://gno.land).

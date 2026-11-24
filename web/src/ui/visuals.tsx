@@ -1,6 +1,6 @@
-// Inline SVG visuals: the mark, the quest-flow diagram, the quest stepper,
-// deadline bars, skeletons and small illustrations. Pure SVG + CSS; every
-// animation rests under prefers-reduced-motion (see styles.css).
+// Inline SVG visuals: the escrow mark, the quest-flow diagram, the quest stepper,
+// deadline bars, skeletons and architectural line illustrations. Pure SVG + CSS;
+// every animation rests under prefers-reduced-motion (see styles.css).
 
 import { useRef, useState } from "react";
 import { Icon } from "./icons";
@@ -8,16 +8,14 @@ import { QuestState, type Quest } from "../lib/amino";
 import { approx, thousands, timeLeft } from "../lib/format";
 import { useInView, usePageVisible } from "./motion";
 
-/** The QuestMaster mark: a notice board hanging from a peg, with a pinned quest. */
+/** The QuestMaster mark: an architectural escrow lock with a verified payout check. */
 export function Mark() {
   return (
     <svg className="mark" viewBox="0 0 32 32" aria-hidden="true">
       <rect x="1" y="1" width="30" height="30" rx="8" fill="var(--brand)" />
-      <path d="M16 5.5v3.2" stroke="var(--brand-ink)" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M9.5 11.5 16 8.7l6.5 2.8" fill="none" stroke="var(--brand-ink)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <rect x="7.5" y="11.5" width="17" height="13" rx="2.2" fill="var(--brand-ink)" />
-      <path d="m12.2 18.2 2.6 2.6 5-5.2" fill="none" stroke="var(--brand)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="16" cy="5" r="1.6" fill="var(--amber)" />
+      <rect x="7.5" y="12.5" width="17" height="12.5" rx="2.5" fill="none" stroke="var(--brand-ink)" strokeWidth="2.1" />
+      <path d="M11.5 12.5V10a4.5 4.5 0 0 1 9 0v2.5" fill="none" stroke="var(--brand-ink)" strokeWidth="2.1" strokeLinecap="round" />
+      <path d="m12.8 18.8 2.2 2.2 4.4-4.6" fill="none" stroke="var(--brand-ink)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -31,11 +29,12 @@ const FLOW = [
 ];
 
 /**
- * How a quest moves. Wide screens: a small looping SVG diagram (a coin
- * travels along the main path; dashed branches show the refund and the
- * timeout payout), with a pause button; it also pauses off-screen and in
- * hidden tabs, and is static under reduced motion. Not rendered on phones
- * (the board leaves it out below 700 px; How it works has the steps).
+ * How a quest moves through escrow. Wide screens: a quiet architectural SVG
+ * diagram (an escrow token travels along the main path; dashed branches show
+ * the refund and the timeout payout), with a pause button; it also pauses
+ * off-screen and in hidden tabs, and is static under reduced motion. Not
+ * rendered on phones (the board leaves it out below 700 px; How it works has
+ * the steps).
  */
 export function QuestFlow() {
   const ref = useRef<HTMLDivElement>(null);
@@ -45,47 +44,56 @@ export function QuestFlow() {
   const running = inView && visible && !userPaused;
   return (
     <div ref={ref} className={`flow ${running ? "" : "paused"}`} data-testid="quest-flow">
+      <div className="flow-bar">
+        <span className="flow-caption">On-chain escrow lifecycle</span>
+        <button
+          type="button"
+          className="btn btn-small btn-ghost flow-toggle"
+          onClick={() => setUserPaused(!userPaused)}
+          aria-pressed={userPaused}
+          aria-label={userPaused ? "Play the diagram" : "Pause the diagram"}
+        >
+          <Icon name={userPaused ? "play" : "pause"} />
+        </button>
+      </div>
       <svg className="flow-svg" viewBox="0 0 616 236" role="img" aria-labelledby="flow-title flow-desc">
         <title id="flow-title">How a quest moves</title>
         <desc id="flow-desc">
           Post, take, submit, approve, paid. Two side exits: a closed quest refunds the poster; a submission left unanswered for about 7 days is paid
           out to the builder.
         </desc>
-        <path className="flow-line" d="M56 86H560" />
-        <path className="flow-line flow-progress" d="M56 86H560" pathLength={100} />
+        <path className="flow-line" d="M56 90H560" />
+        <path className="flow-line flow-progress" d="M56 90H560" pathLength={100} />
         {/* side exits */}
-        <path className="flow-branch" d="M182 104v54q0 14 14 14h40" />
-        <path className="flow-branch timeout" d="M308 104v54q0 14 14 14h224q14 0 14-14V104" />
-        <g className="flow-exit" transform="translate(236 172)">
-          <rect x="0" y="-16" width="150" height="32" rx="16" />
-          <text x="75" y="5" textAnchor="middle">Closed · refunded</text>
+        <path className="flow-branch" d="M182 110v52q0 14 14 14h38" />
+        <path className="flow-branch timeout" d="M308 110v52q0 14 14 14h224q14 0 14-14V110" />
+        <g className="flow-exit" transform="translate(234 176)">
+          <rect x="0" y="-17" width="152" height="34" rx="8" />
+          <text x="76" y="5" textAnchor="middle">Closed · refunded</text>
         </g>
-        <g className="flow-exit timeout" transform="translate(400 172)">
-          <rect x="0" y="-16" width="150" height="32" rx="16" />
-          <text x="75" y="5" textAnchor="middle">7 days · auto-pay</text>
+        <g className="flow-exit timeout" transform="translate(398 176)">
+          <rect x="0" y="-17" width="152" height="34" rx="8" />
+          <text x="76" y="5" textAnchor="middle">7 days · auto-pay</text>
         </g>
         {FLOW.map((n, i) => (
-          <g key={n.label} className="flow-node" style={{ ["--i" as string]: i }} transform={`translate(${n.x} 86)`}>
-            <circle r="17" />
+          <g key={n.label} className="flow-node" style={{ ["--i" as string]: i }} transform={`translate(${n.x} 90)`}>
+            <circle r="18" />
             <text className="flow-num" y="5" textAnchor="middle">
               {i + 1}
             </text>
-            <text className="flow-label" y="-30" textAnchor="middle">
+            <text className="flow-label" y="-32" textAnchor="middle">
               {n.label}
             </text>
-            <text className="flow-sub" y="44" textAnchor="middle">
+            <text className="flow-sub" y="42" textAnchor="middle">
               {n.sub}
             </text>
           </g>
         ))}
         <g className="flow-coin">
-          <circle r="9" />
+          <circle r="8.5" />
           <path d="M-3 0h6M0-3v6" />
         </g>
       </svg>
-      <button type="button" className="btn btn-small btn-ghost flow-toggle" onClick={() => setUserPaused(!userPaused)} aria-pressed={userPaused} aria-label={userPaused ? "Play the diagram" : "Pause the diagram"}>
-        <Icon name={userPaused ? "play" : "pause"} />
-      </button>
     </div>
   );
 }
@@ -103,11 +111,7 @@ export function QuestStepper({ q }: { q: Quest }) {
         return (
           <li key={s} className={`step ${state}`} aria-current={state === "current" ? "step" : undefined}>
             <span className="step-dot" aria-hidden="true">
-              {state === "done" ? (
-                <Icon name="check" />
-              ) : (
-                i + 1
-              )}
+              {state === "done" ? <Icon name="check" /> : i + 1}
             </span>
             <span className="step-label">{s}</span>
           </li>
@@ -197,42 +201,42 @@ export function SkeletonQuest() {
   );
 }
 
-// ------------------------------------------------------------------ small illustrations
+// ------------------------------------------------------------------ architectural line illustrations
 
-/** An empty notice board (no quests yet). */
+/** An empty ledger sheet (no quests yet). */
 export function EmptyArt() {
   return (
     <svg className="art art-wide" viewBox="0 0 96 72" aria-hidden="true">
-      <path d="M48 6v8" className="art-line" />
-      <path d="M22 22 48 12l26 10" className="art-line" />
-      <rect x="14" y="22" width="68" height="44" rx="6" className="art-board" />
-      <rect x="26" y="32" width="18" height="22" rx="2" className="art-paper dashed" />
-      <rect x="52" y="32" width="18" height="22" rx="2" className="art-paper dashed" />
-      <circle cx="48" cy="6" r="3" className="art-amber" />
+      <rect x="14" y="10" width="68" height="52" rx="6" className="art-board" />
+      <path d="M14 23h68" className="art-line thin" />
+      <rect x="24" y="31" width="48" height="9" rx="2" className="art-paper dashed" />
+      <rect x="24" y="45" width="32" height="9" rx="2" className="art-paper dashed" />
+      <circle cx="24" cy="16.5" r="2.2" className="art-brand" />
+      <circle cx="32" cy="16.5" r="2.2" className="art-muted" />
     </svg>
   );
 }
 
-/** A lantern with a pause mark (waiting, not live yet). */
+/** A paused escrow node (waiting for approval, not live yet). */
 export function WaitingArt() {
   return (
     <svg className="art" viewBox="0 0 72 72" aria-hidden="true">
-      <path d="M36 6v6" className="art-line" />
-      <path d="M26 14h20l4 8H22z" className="art-board" />
-      <rect x="22" y="22" width="28" height="34" rx="6" className="art-paper" />
-      <circle cx="36" cy="39" r="8" className="art-glow" />
-      <path d="M26 58h20" className="art-line" />
+      <rect x="14" y="16" width="44" height="40" rx="8" className="art-paper" />
+      <circle cx="36" cy="36" r="12" className="art-amber-soft" />
+      <path d="M36 28v8l5 3" className="art-amber-stroke" />
+      <circle cx="36" cy="11" r="2.5" className="art-amber" />
     </svg>
   );
 }
 
-/** A torn notice (something went wrong). */
+/** A broken ledger link (chain read failed). */
 export function ErrorArt() {
   return (
     <svg className="art" viewBox="0 0 72 72" aria-hidden="true">
-      <path d="M16 12h40v30l-8 6 6 6-6 6H16z" className="art-paper" />
-      <path d="M26 26h20M26 34h14" className="art-line" />
-      <circle cx="36" cy="8" r="3" className="art-amber" />
+      <rect x="14" y="14" width="44" height="44" rx="8" className="art-paper" />
+      <path d="M26 28h20M26 36h13" className="art-line thin" />
+      <circle cx="48" cy="46" r="9" className="art-danger-soft" />
+      <path d="M48 41.5v5M48 50h.01" className="art-danger-stroke" />
     </svg>
   );
 }
@@ -248,14 +252,14 @@ export function CoinBurst() {
   );
 }
 
-/** Small looping illustrations for the five steps on the How it works page. */
+/** Clean geometric illustrations for the five escrow steps on the How it works page. */
 export function StepArt({ step }: { step: 1 | 2 | 3 | 4 | 5 }) {
   return (
     <svg className={`step-art step-art-${step}`} viewBox="0 0 80 64" aria-hidden="true">
       {step === 1 && (
         <>
-          <rect x="18" y="34" width="44" height="22" rx="4" className="art-board" />
-          <path d="M18 40h44" className="art-line" />
+          <rect x="18" y="34" width="44" height="22" rx="5" className="art-board" />
+          <path d="M18 41h44" className="art-line thin" />
           <g className="sa-drop">
             <circle cx="40" cy="14" r="7" className="art-coin" />
             <path d="M37 14h6" className="art-coin-mark" />
@@ -266,35 +270,35 @@ export function StepArt({ step }: { step: 1 | 2 | 3 | 4 | 5 }) {
         <>
           <rect x="14" y="10" width="52" height="44" rx="5" className="art-board" />
           <g className="sa-lift">
-            <rect x="28" y="20" width="24" height="26" rx="2" className="art-paper" />
-            <path d="M33 29h14M33 35h10" className="art-line thin" />
+            <rect x="26" y="19" width="28" height="26" rx="3" className="art-paper" />
+            <path d="M32 28h16M32 34h11" className="art-line thin" />
           </g>
-          <circle cx="40" cy="20" r="2.5" className="art-amber" />
+          <circle cx="40" cy="19" r="2.5" className="art-brand" />
         </>
       )}
       {step === 3 && (
         <>
-          <rect x="10" y="22" width="26" height="20" rx="4" className="art-paper" />
-          <rect x="46" y="18" width="24" height="28" rx="4" className="art-board" />
-          <path d="M20 32h4M28 32h4" className="art-line thin" />
+          <rect x="10" y="21" width="25" height="22" rx="4" className="art-paper" />
+          <rect x="47" y="17" width="23" height="30" rx="4" className="art-board" />
+          <path d="M17 32h11" className="art-line thin" />
           <g className="sa-send">
-            <path d="M38 32h6l-3-3m3 3-3 3" className="art-line" />
+            <path d="M38 32h6l-3-3m3 3-3 3" className="art-brand-stroke" />
           </g>
         </>
       )}
       {step === 4 && (
         <>
-          <rect x="20" y="10" width="40" height="44" rx="4" className="art-paper" />
-          <path d="M28 22h24M28 29h18" className="art-line thin" />
+          <rect x="18" y="10" width="44" height="44" rx="5" className="art-paper" />
+          <path d="M27 22h26M27 29h18" className="art-line thin" />
           <g className="sa-stamp">
-            <circle cx="46" cy="42" r="10" className="art-stamp" />
-            <path d="m41 42 3.5 3.5 6-6.5" className="art-stamp-mark" />
+            <circle cx="47" cy="41" r="10" className="art-stamp" />
+            <path d="m42.5 41 3 3 5.5-6" className="art-stamp-mark" />
           </g>
         </>
       )}
       {step === 5 && (
         <>
-          <path d="M14 48h52" className="art-line" />
+          <path d="M14 49h52" className="art-line thin" />
           <g className="sa-stack">
             <ellipse cx="40" cy="44" rx="12" ry="4" className="art-coin" />
             <ellipse cx="40" cy="37" rx="12" ry="4" className="art-coin" />

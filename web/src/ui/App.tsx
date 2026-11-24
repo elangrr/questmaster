@@ -45,7 +45,7 @@ function titleFor(path: string): string {
 }
 
 /**
- * Re-mounts on each route so the page fades in once (no motion under reduced
+ * Re-mounts on each route so the page settles in once (no motion under reduced
  * motion). On every route change after the first: new title, back to the top,
  * and focus on the main region so keyboard and screen-reader users land on the
  * new page instead of an unmounted link.
@@ -101,6 +101,7 @@ function WalletButton() {
     );
   return (
     <a className="btn btn-small wallet-addr mono" href={`#/address/${w.address}`} title={w.address}>
+      <span className="wallet-dot" aria-hidden="true" />
       {shortAddr(w.address)}
     </a>
   );
@@ -137,19 +138,22 @@ function Shell() {
             <Mark />
             QuestMaster
           </a>
-          {/* Wide screens: one row. Narrower: brand and actions on top, then one
-              scrollable row with the network label and the links (never two rows of links). */}
-          <div className="top-nav">
+          <div className="top-net">
             <span className="net" title={`Chain ${config.chainId}, ${config.rpcUrl}`}>
               {config.networkName} · test GNOT
             </span>
+          </div>
+          {/* Wide screens: one row. Narrower: testnet tag on top, brand + actions,
+              then one scrollable row of links starting at Board so primary routes
+              stay visible without scrolling. */}
+          <div className="top-nav">
             <nav className="nav" aria-label="Main">
-            <NavLink to="/">Board</NavLink>
-            <NavLink to="/paid">Paid</NavLink>
-            <NavLink to="/mine">My quests</NavLink>
-            <NavLink to="/post">Post</NavLink>
-            <NavLink to="/how">How it works</NavLink>
-            <NavLink to="/agents">AI agents</NavLink>
+              <NavLink to="/">Board</NavLink>
+              <NavLink to="/paid">Paid</NavLink>
+              <NavLink to="/mine">My quests</NavLink>
+              <NavLink to="/post">Post</NavLink>
+              <NavLink to="/how">How it works</NavLink>
+              <NavLink to="/agents">AI agents</NavLink>
             </nav>
           </div>
           <div className="top-actions">
@@ -168,18 +172,18 @@ function Shell() {
       </main>
       <footer className="foot">
         <div className="foot-inner">
-        <p>
-          Built on <a href="https://gno.land" target="_blank" rel="noopener noreferrer">gno.land</a> ·{" "}
-          <a href={config.sourceUrl} target="_blank" rel="noopener noreferrer">Source</a> · Realm{" "}
-          <a className="mono" href={gnowebPage()} target="_blank" rel="noopener noreferrer" aria-label={config.realmPath} title={config.realmPath}>
-            <span className="path-full">{config.realmPath}</span>
-            <span className="path-short" aria-hidden="true">
-              {config.realmPath.replace(/g1[0-9a-z]{38}/, (a) => shortAddr(a))}
-            </span>
-          </a>
-        </p>
-        <p className="muted">Not an official Gno.land product. Testnet only: {config.networkName} ({config.chainId}), test GNOT.</p>
-        <PriceFootnote />
+          <p>
+            Built on <a href="https://gno.land" target="_blank" rel="noopener noreferrer">gno.land</a> ·{" "}
+            <a href={config.sourceUrl} target="_blank" rel="noopener noreferrer">Source</a> · Realm{" "}
+            <a className="mono" href={gnowebPage()} target="_blank" rel="noopener noreferrer" aria-label={config.realmPath} title={config.realmPath}>
+              <span className="path-full">{config.realmPath}</span>
+              <span className="path-short" aria-hidden="true">
+                {config.realmPath.replace(/g1[0-9a-z]{38}/, (a) => shortAddr(a))}
+              </span>
+            </a>
+          </p>
+          <p className="muted">Not an official Gno.land product. Testnet only: {config.networkName} ({config.chainId}), test GNOT.</p>
+          <PriceFootnote />
         </div>
       </footer>
     </>

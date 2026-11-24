@@ -1,9 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <style>.b{fill:#24604f}.i{fill:#f6f0e2}.s{stroke:#f6f0e2}.c{stroke:#24604f}@media (prefers-color-scheme:dark){.b{fill:#6fc0a3}.i{fill:#0e1d17}.s{stroke:#0e1d17}.c{stroke:#6fc0a3}}</style>
-  <rect class="b" x="1" y="1" width="30" height="30" rx="8"/>
-  <path class="s" d="M16 5.5v3.2" stroke-width="1.8" stroke-linecap="round"/>
-  <path class="s" d="M9.5 11.5 16 8.7l6.5 2.8" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect class="i" x="7.5" y="11.5" width="17" height="13" rx="2.2"/>
-  <path class="c" d="m12.2 18.2 2.6 2.6 5-5.2" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="16" cy="5" r="1.6" fill="#c98a24"/>
+  <style>
+    .bg{fill:#1a4fd6}.fg{stroke:#ffffff}.dot{fill:#f5b749}
+    @media (prefers-color-scheme:dark){.bg{fill:#6095ff}.fg{stroke:#071124}.dot{fill:#071124}}
+  </style>
+  <rect class="bg" x="1" y="1" width="30" height="30" rx="8"/>
+  <rect class="fg" x="7.5" y="12.5" width="17" height="12.5" rx="2.5" fill="none" stroke-width="2.1"/>
+  <path class="fg" d="M11.5 12.5V10a4.5 4.5 0 0 1 9 0v2.5" fill="none" stroke-width="2.1" stroke-linecap="round"/>
+  <path class="fg" d="m12.8 18.8 2.2 2.2 4.4-4.6" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

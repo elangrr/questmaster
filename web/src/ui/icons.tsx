@@ -13,6 +13,9 @@ const PATHS = {
   chevron: "M8 10l4 4 4-4",
   pause: "M9 6v12M15 6v12",
   play: "M8 5.5v13l11-6.5-11-6.5Z",
+  lock: "M7 11h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2Zm2 0V8a3 3 0 0 1 6 0v3",
+  clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v4.5l3 1.5",
+  "external-link": "M14 5h5v5M19 5l-9 9M10 7H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-4",
 } as const;
 
 export type IconName = keyof typeof PATHS;

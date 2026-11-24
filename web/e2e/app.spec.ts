@@ -838,6 +838,7 @@ for (const scheme of ["light", "dark"] as const) {
         ["/paid", "paid"],
         ["/quest/7", "quest-hostile"],
         ["/post", "post"],
+        ["/mine", "mine"],
         ["/how", "how"],
         ["/agents", "agents"],
         ["/quest/34", "quest-record-clean"],
@@ -855,6 +856,7 @@ for (const scheme of ["light", "dark"] as const) {
       const claim = page.locator(".action", { hasText: "Take this quest" });
       await claim.getByRole("button", { name: "Other ways" }).click();
       await claim.locator("[data-poster-note]").waitFor();
+      await page.evaluate(() => window.scrollTo(0, 0));
       await page.waitForTimeout(500);
       await page.screenshot({ path: `${SHOTS}/quest-caution-${name}-${scheme}.png`, fullPage: true });
       await ctx.close();

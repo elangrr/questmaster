@@ -172,11 +172,16 @@ full audit (all pages, 360-1280 px, light and dark), and
 `node e2e/audit-report.mjs <folder>` turns it into a table.
 
 Colours, type sizes, spacing and motion timings are tokens at the top of
-`src/styles.css`, with a light ("parchment") and a dark theme. Headings use the
-system serif stack, body text the system sans; no web fonts are downloaded.
-Visuals are inline SVG in `src/ui/visuals.tsx` (the mark, the quest-flow
-diagram, the quest stepper, deadline bars, skeletons, small illustrations);
-motion helpers are in `src/ui/motion.ts`. There is no animation library.
+`src/styles.css`, with a light ("ledger paper") and a dark ("onyx slate")
+theme anchored by a single cobalt accent. The app bundles local Latin
+`woff2` subsets of **IBM Plex Sans** (400/500/600/700) and **IBM Plex Mono**
+(400/500) in `src/assets/fonts/` under the **SIL Open Font License 1.1**
+(Copyright (c) 2017 IBM Corp., see `NOTICE`); no fonts are fetched from any
+CDN or third-party host.
+Visuals are inline SVG in `src/ui/visuals.tsx` (the escrow mark, the
+quest-flow diagram, the quest stepper, deadline bars, skeletons, small
+illustrations); motion helpers are in `src/ui/motion.ts`. There is no
+animation library.
 
 - Under `prefers-reduced-motion: reduce` every animation and transition
   settles at once: the diagram is shown in its final state and totals appear

@@ -32,7 +32,7 @@ export function StateBadge({ q }: { q: Quest }) {
 
 /** A GNOT amount, with the approximate dollar value after it (or under it with usd="block"). */
 export function Gnot({ ugnot, usd = "inline" }: { ugnot: bigint; usd?: "inline" | "block" | "none" }) {
-  return (
+  const body = (
     <>
       <span className="amount">
         {gnot(ugnot)} <span className="unit">GNOT</span>
@@ -40,6 +40,7 @@ export function Gnot({ ugnot, usd = "inline" }: { ugnot: bigint; usd?: "inline" 
       {usd !== "none" && <Usd ugnot={ugnot} block={usd === "block"} />}
     </>
   );
+  return usd === "inline" ? <span className="gnot-inline">{body}</span> : body;
 }
 
 /**
@@ -61,7 +62,7 @@ export function GnotTotal({ ugnot }: { ugnot: bigint }) {
 export function Addr({ a }: { a: string }) {
   if (!a) return <span className="muted">none</span>;
   return (
-    <a className="addr" href={`#/address/${a}`} title={a}>
+    <a className="addr nowrap" href={`#/address/${a}`} title={a}>
       {shortAddr(a)}
     </a>
   );
@@ -149,21 +150,27 @@ export function QuestTable({ quests, show }: { quests: Quest[]; show: "open" | "
         <tbody>
           {quests.map((q, i) => (
             <tr key={q.id.toString()} style={{ ["--r" as string]: i }}>
-              <td className="num muted">{q.id.toString()}</td>
+              <td className="num id-cell muted">{q.id.toString()}</td>
               <td className="title-cell">
                 <a href={`#/quest/${q.id}`}>{q.title}</a>
-                {/* Phones: reward and state under the title, so the title gets the full width. */}
+                {/* Phones: reward, work window or state under the title, so the title uses the full width. */}
                 <span className="cell-meta show-sm">
                   <Gnot ugnot={q.reward} />
+                  {show === "open" && <span className="muted small nowrap">{approx(q.workBlocks)}</span>}
                   {show === "any" && <StateBadge q={q} />}
                 </span>
               </td>
               <td className="num hide-sm">
                 <Gnot ugnot={q.reward} usd="block" />
               </td>
-              {show === "open" && <td className="hide-sm muted nowrap" title={approx(q.workBlocks)}>{thousands(q.workBlocks)} blocks</td>}
+              {show === "open" && (
+                <td className="hide-sm nowrap" title={approx(q.workBlocks)}>
+                  <span className="cell-window">{thousands(q.workBlocks)} blocks</span>
+                  <span className="cell-sub small muted">{approx(q.workBlocks)}</span>
+                </td>
+              )}
               {show === "paid" && (
-                <td className="hide-sm">
+                <td className="hide-sm nowrap">
                   <Addr a={q.builder} />
                 </td>
               )}
@@ -172,7 +179,11 @@ export function QuestTable({ quests, show }: { quests: Quest[]; show: "open" | "
                   <StateBadge q={q} />
                 </td>
               )}
-              {show !== "paid" && <td className="num hide-sm muted">{q.rejectCount}</td>}
+              {show !== "paid" && (
+                <td className="num hide-sm">
+                  <span className={q.rejectCount > 0 ? "reject-num" : "muted"}>{q.rejectCount}</span>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -187,15 +198,23 @@ export function Pager({ page, total, pageSize, base }: { page: number; total: nu
   const sep = base.includes("?") ? "&" : "?";
   return (
     <nav className="pager" aria-label="Pages">
-      {page > 1 ? <a className="btn" href={`#${base}${sep}page=${page - 1}`}>
+      {page > 1 ? (
+        <a className="btn" href={`#${base}${sep}page=${page - 1}`}>
           <Icon name="arrow-left" /> Newer
-        </a> : <span />}
-      <span className="muted">
+        </a>
+      ) : (
+        <span />
+      )}
+      <span className="muted small pager-count">
         Page {page} of {last}
       </span>
-      {page < last ? <a className="btn" href={`#${base}${sep}page=${page + 1}`}>
+      {page < last ? (
+        <a className="btn" href={`#${base}${sep}page=${page + 1}`}>
           Older <Icon name="arrow-right" />
-        </a> : <span />}
+        </a>
+      ) : (
+        <span />
+      )}
     </nav>
   );
 }
@@ -204,6 +223,7 @@ export function CopyButton({ text, label = "Copy", name }: { text: string; label
   const [done, setDone] = useState(false);
   return (
     <button
+      type="button"
       className="btn btn-small"
       aria-label={name ? `${done ? "Copied" : label}: ${name}` : undefined}
       onClick={() => {
@@ -222,6 +242,6 @@ export function CopyButton({ text, label = "Copy", name }: { text: string; label
 }
 
 /** Text from the chain, shown as plain text with its line breaks. */
-export function PlainText({ text }: { text: string }) {
-  return <div className="plain">{text}</div>;
+export function PlainText({ text, tone }: { text: string; tone?: "reject" }) {
+  return <div className={tone === "reject" ? "plain plain-reject" : "plain"}>{text}</div>;
 }
