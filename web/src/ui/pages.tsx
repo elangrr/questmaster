@@ -943,8 +943,8 @@ export function Agents() {
           it could also take and submit quests, signing like any wallet.
         </p>
         <p className="muted small">
-          Verified for this guide: reads only (render and eval), on Onyx for the escrow package and on a local test chain for the realm, which is
-          still waiting for approval on Onyx. No write was run.
+          Verified for this guide: reads only (render and eval), on Onyx on 24 November 2026 and on a local test chain. The realm is live on Onyx,
+          but no quest had been posted there yet, so reads of a quest were checked on the local chain. No write was run.
         </p>
       </div>
 
