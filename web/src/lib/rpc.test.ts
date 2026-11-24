@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { config } from "../config";
 import fx from "../__fixtures__/gnodev-qeval-json.json";
 import { DecodeError, decodeIds, decodeInt, decodeQuest, decodeTotals } from "./amino";
-import { abciQuery, invalidate, notLiveMessage, packageStatus, read, ReadError } from "./rpc";
+import { abciQuery, invalidate, notLiveMessage, packageStatus, read, READ_TIMEOUT_MS, ReadError } from "./rpc";
 
 // Real gnodev qeval_json answers (decoded text + error), keyed by expression.
 const R = fx.responses as Record<string, { data: string; error: { "@type": string; value?: string } | null }>;
@@ -70,6 +70,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -182,12 +183,87 @@ describe("abciQuery", () => {
       ["result null", { result: null }],
       ["no response", { result: {} }],
       ["no ResponseBase", { result: { response: {} } }],
+      ["JSON null", null],
+      ["a JSON number", 42],
+      ["a JSON boolean", true],
       ["a JSON array", []],
       ["a JSON string", "hello"],
     ])("%s", async (_name, body) => {
       const e = await readError(abciQuery("p", "d", fakeFetch(httpReply(200, body)).fn));
       expect(e.kind).toBe("network");
       expect(e.message).toBe("The node sent an unexpected response. Try again in a moment.");
+    });
+
+    it("invalid base64 in ResponseBase.Data becomes ReadError('network')", async () => {
+      const e = await readError(abciQuery("p", "d", fakeFetch(abciReply({ Data: "%%%" })).fn));
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe("The node sent an unexpected response. Try again in a moment.");
+    });
+
+    it("valid base64 of invalid UTF-8 does not throw and replaces bad bytes", async () => {
+      const r = await abciQuery("p", "d", fakeFetch(abciReply({ Data: btoa("\xff\xfe") })).fn);
+      expect(r).toEqual({ data: "\ufffd\ufffd", error: null, log: "" });
+    });
+  });
+
+  describe("timeout", () => {
+    const TIMEOUT_MSG = `The ${config.networkName} node at ${config.rpcUrl} did not answer in time. Try again in a moment.`;
+    const UNREACHABLE_MSG = `Could not reach the ${config.networkName} node at ${config.rpcUrl}.`;
+
+    it("exports READ_TIMEOUT_MS as 12000 and passes an AbortSignal to fetch", async () => {
+      expect(READ_TIMEOUT_MS).toBe(12_000);
+      vi.useFakeTimers();
+      const f = fakeFetch(abciReply({ Data: b64("ok") }));
+      const r = await abciQuery("vm/qeval_json", "ping", f.fn);
+      expect(r.data).toBe("ok");
+      expect(f.sent[0].init?.signal).toBeInstanceOf(AbortSignal);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("aborts and rejects with ReadError('network') at 12000 ms, not at 11999 ms, when fetch never resolves", async () => {
+      vi.useFakeTimers();
+      const f = fakeFetch(() => new Promise<Response>(() => {}));
+      let settled = false;
+      const p = readError(abciQuery("vm/qeval_json", "hang", f.fn)).finally(() => {
+        settled = true;
+      });
+      await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS - 1);
+      expect(settled).toBe(false);
+      expect(f.sent[0].init?.signal?.aborted).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      const e = await p;
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe(TIMEOUT_MSG);
+      expect(f.sent[0].init?.signal?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("also times out when headers arrive but res.json() never resolves", async () => {
+      vi.useFakeTimers();
+      const hangingBody = { ok: true, status: 200, json: () => new Promise(() => {}) } as unknown as Response;
+      const f = fakeFetch(hangingBody);
+      let settled = false;
+      const p = readError(abciQuery("vm/qeval_json", "slow-body", f.fn)).finally(() => {
+        settled = true;
+      });
+      await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS - 1);
+      expect(settled).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      const e = await p;
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe(TIMEOUT_MSG);
+      expect(f.sent[0].init?.signal?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("clears the timer and keeps the unreachable message on a non-timeout failure", async () => {
+      vi.useFakeTimers();
+      const e = await readError(abciQuery("vm/qeval_json", "fail", fakeFetch(new TypeError("Failed to fetch")).fn));
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe(UNREACHABLE_MSG);
+      expect(vi.getTimerCount()).toBe(0);
     });
   });
 });
@@ -351,6 +427,18 @@ describe("read (realm reads through vm/qeval_json)", () => {
   });
 
   describe("failed or non-OK HTTP responses", () => {
+    const ALL_READS: readonly [string, () => Promise<unknown>][] = [
+      ["totals", () => read.totals()],
+      ["quest", () => read.quest(17n)],
+      ["openIds", () => read.openIds(3, 11)],
+      ["paidIds", () => read.paidIds(5, 13)],
+      ["posterIds", () => read.posterIds(POSTER, 7, 19)],
+      ["builderIds", () => read.builderIds(BUILDER, 9, 23)],
+      ["posterCount", () => read.posterCount(OTHER)],
+      ["builderCount", () => read.builderCount(POSTER)],
+      ["height", () => read.height()],
+    ];
+
     it("HTTP 500 is ReadError('network')", async () => {
       useFetch(httpReply(500, {}));
       const e = await readError(read.quest(1n));
@@ -361,9 +449,36 @@ describe("read (realm reads through vm/qeval_json)", () => {
       useFetch(new TypeError("Failed to fetch"));
       expect((await readError(read.openIds(0, 20))).kind).toBe("network");
     });
+
+    it.each(ALL_READS)("%s rejects with the HTTP 403 ReadError on status 403", async (_name, call) => {
+      useFetch(httpReply(403, { result: { sync_info: { latest_block_height: "42" } } }));
+      const e = await readError(call());
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe(
+        `The node at ${config.rpcUrl} does not allow these read queries (HTTP 403). Set VITE_RPC_URL to a node that does.`,
+      );
+    });
+
+    it.each(ALL_READS)("%s rejects with the HTTP status ReadError on status 502", async (_name, call) => {
+      useFetch(httpReply(502, { result: { sync_info: { latest_block_height: "99" } } }));
+      const e = await readError(call());
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe("The node had a problem (HTTP 502). Try again in a moment.");
+    });
   });
 
   describe("malformed or unexpected bodies", () => {
+    const ABCI_READS: readonly [string, () => Promise<unknown>][] = [
+      ["totals", () => read.totals()],
+      ["quest", () => read.quest(29n)],
+      ["openIds", () => read.openIds(2, 15)],
+      ["paidIds", () => read.paidIds(4, 16)],
+      ["posterIds", () => read.posterIds(POSTER, 6, 18)],
+      ["builderIds", () => read.builderIds(BUILDER, 8, 21)],
+      ["posterCount", () => read.posterCount(OTHER)],
+      ["builderCount", () => read.builderCount(POSTER)],
+    ];
+
     it("an answer the decoder cannot read rejects with DecodeError", async () => {
       useFetch(abciReply({ Data: b64('{"results":[]}') }));
       await expect(read.totals()).rejects.toBeInstanceOf(DecodeError);
@@ -375,6 +490,20 @@ describe("read (realm reads through vm/qeval_json)", () => {
     it("a JSON-RPC envelope without a response is ReadError('network')", async () => {
       useFetch(httpReply(200, { result: {} }));
       expect((await readError(read.quest(2n))).message).toContain("unexpected response");
+    });
+
+    it.each(ABCI_READS)("%s rejects a JSON null body with ReadError('network')", async (_name, call) => {
+      useFetch(httpReply(200, null));
+      const e = await readError(call());
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe("The node sent an unexpected response. Try again in a moment.");
+    });
+
+    it.each(ABCI_READS)("%s rejects invalid base64 in ResponseBase.Data with ReadError('network')", async (_name, call) => {
+      useFetch(abciReply({ Data: "%%%" }));
+      const e = await readError(call());
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe("The node sent an unexpected response. Try again in a moment.");
     });
   });
 
@@ -437,10 +566,24 @@ describe("read (realm reads through vm/qeval_json)", () => {
       await expect(read.totals()).resolves.toEqual(decodeTotals(R["GetTotals()"].data));
       expect(f.calls()).toBe(2);
     });
+
+    it("timed-out reads are not cached", async () => {
+      vi.useFakeTimers();
+      const f = useFetch(() => new Promise<Response>(() => {}), fixtureReply("GetTotals()"));
+      const first = readError(read.totals());
+      await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS);
+      const e = await first;
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe(`The ${config.networkName} node at ${config.rpcUrl} did not answer in time. Try again in a moment.`);
+      await expect(read.totals()).resolves.toEqual(decodeTotals(R["GetTotals()"].data));
+      expect(f.calls()).toBe(2);
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 
   describe("height (GET /status)", () => {
     const status = (h: unknown) => httpReply(200, { jsonrpc: "2.0", id: -1, result: { sync_info: { latest_block_height: h } } });
+    const TIMEOUT_MSG = `The ${config.networkName} node at ${config.rpcUrl} did not answer in time. Try again in a moment.`;
 
     it("returns the latest block height as a bigint from <rpcUrl>/status", async () => {
       const f = useFetch(status("9007199254740993"));
@@ -466,11 +609,24 @@ describe("read (realm reads through vm/qeval_json)", () => {
       expect((await readError(read.height())).kind).toBe("network");
     });
 
-    it("an HTTP error without a height is ReadError('network')", async () => {
-      useFetch(httpReply(500, { error: { message: "Internal error" } }));
+    it("HTTP 403 is ReadError('network') with the 403 message, even if the body has a height", async () => {
+      const json = vi.fn(async () => ({ result: { sync_info: { latest_block_height: "54321" } } }));
+      useFetch({ ok: false, status: 403, json } as unknown as Response);
       const e = await readError(read.height());
       expect(e.kind).toBe("network");
-      expect(e.message).toBe("The node did not report its block height.");
+      expect(e.message).toBe(
+        `The node at ${config.rpcUrl} does not allow these read queries (HTTP 403). Set VITE_RPC_URL to a node that does.`,
+      );
+      expect(json).not.toHaveBeenCalled();
+    });
+
+    it("a non-OK HTTP status is ReadError('network') naming the status, even when the body has a height", async () => {
+      const json = vi.fn(async () => ({ result: { sync_info: { latest_block_height: "98765" } } }));
+      useFetch({ ok: false, status: 503, json } as unknown as Response);
+      const e = await readError(read.height());
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe("The node had a problem (HTTP 503). Try again in a moment.");
+      expect(json).not.toHaveBeenCalled();
     });
 
     it("an error answer from the node is ReadError('network')", async () => {
@@ -480,6 +636,7 @@ describe("read (realm reads through vm/qeval_json)", () => {
 
     it.each([
       ["not JSON", httpReply(200, null, { notJson: true })],
+      ["JSON null", httpReply(200, null)],
       ["a number instead of a string", status(12)],
       ["a negative height", status("-1")],
       ["an empty height", status("")],
@@ -490,6 +647,56 @@ describe("read (realm reads through vm/qeval_json)", () => {
       const e = await readError(read.height());
       expect(e.kind).toBe("network");
       expect(e.message).toBe("The node did not report its block height.");
+    });
+
+    it("passes an AbortSignal and leaves no timer pending when /status answers in time", async () => {
+      vi.useFakeTimers();
+      const f = useFetch(status("4242"));
+      expect(await read.height()).toBe(4242n);
+      expect(f.sent[0].init?.signal).toBeInstanceOf(AbortSignal);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("times out at 12000 ms (not 11999 ms) when /status fetch never resolves and does not cache the timeout", async () => {
+      vi.useFakeTimers();
+      const f = useFetch(() => new Promise<Response>(() => {}), status("7777"));
+      let settled = false;
+      const first = readError(read.height()).finally(() => {
+        settled = true;
+      });
+      await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS - 1);
+      expect(settled).toBe(false);
+      expect(f.sent[0].init?.signal?.aborted).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      const e = await first;
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe(TIMEOUT_MSG);
+      expect(f.sent[0].init?.signal?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+
+      expect(await read.height()).toBe(7777n);
+      expect(f.calls()).toBe(2);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("also times out when /status headers arrive but res.json() never resolves", async () => {
+      vi.useFakeTimers();
+      const hangingBody = { ok: true, status: 200, json: () => new Promise(() => {}) } as unknown as Response;
+      const f = useFetch(hangingBody);
+      let settled = false;
+      const p = readError(read.height()).finally(() => {
+        settled = true;
+      });
+      await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS - 1);
+      expect(settled).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      const e = await p;
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe(TIMEOUT_MSG);
+      expect(f.sent[0].init?.signal?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
     });
   });
 });

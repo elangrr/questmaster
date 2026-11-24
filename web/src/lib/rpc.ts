@@ -20,7 +20,40 @@ interface AbciResult {
   log: string;
 }
 
+export const READ_TIMEOUT_MS = 12_000;
+
 let rpcId = 0;
+
+function checkHttpStatus(res: Response): void {
+  if (res.status === 403)
+    throw new ReadError("network", `The node at ${config.rpcUrl} does not allow these read queries (HTTP 403). Set VITE_RPC_URL to a node that does.`);
+  if (!res.ok) throw new ReadError("network", `The node had a problem (HTTP ${res.status}). Try again in a moment.`);
+}
+
+function timeoutError(): ReadError {
+  return new ReadError("network", `The ${config.networkName} node at ${config.rpcUrl} did not answer in time. Try again in a moment.`);
+}
+
+async function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      reject(timeoutError());
+    }, READ_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([run(controller.signal), timeout]);
+  } catch (e) {
+    if (timedOut) throw timeoutError();
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function b64decode(s: string): string {
   const bin = atob(s);
@@ -38,36 +71,48 @@ function toBase64(s: string): string {
 
 /** One abci_query call. Throws ReadError("network") on transport problems. */
 export async function abciQuery(path: string, data: string, fetchFn: typeof fetch = fetch): Promise<AbciResult> {
-  let res: Response;
-  try {
-    res = await fetchFn(config.rpcUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: ++rpcId,
-        method: "abci_query",
-        params: { path, data: toBase64(data) },
-      }),
-    });
-  } catch {
-    throw new ReadError("network", `Could not reach the ${config.networkName} node at ${config.rpcUrl}.`);
-  }
-  if (res.status === 403)
-    throw new ReadError("network", `The node at ${config.rpcUrl} does not allow these read queries (HTTP 403). Set VITE_RPC_URL to a node that does.`);
-  if (!res.ok) throw new ReadError("network", `The node had a problem (HTTP ${res.status}). Try again in a moment.`);
-  let json: any;
-  try {
-    json = await res.json();
-  } catch {
-    throw new ReadError("network", "The node sent a response that is not JSON. Try again in a moment.");
-  }
+  const json = await withTimeout(async (signal) => {
+    let res: Response;
+    try {
+      res = await fetchFn(config.rpcUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: ++rpcId,
+          method: "abci_query",
+          params: { path, data: toBase64(data) },
+        }),
+        signal,
+      });
+    } catch {
+      throw new ReadError("network", `Could not reach the ${config.networkName} node at ${config.rpcUrl}.`);
+    }
+    checkHttpStatus(res);
+    try {
+      return await res.json();
+    } catch {
+      throw new ReadError("network", "The node sent a response that is not JSON. Try again in a moment.");
+    }
+  });
+  if (!json || typeof json !== "object" || Array.isArray(json))
+    throw new ReadError("network", "The node sent an unexpected response. Try again in a moment.");
   if (json.error) throw new ReadError("network", `The node returned an error: ${String(json.error.message ?? json.error.data ?? "unknown")}`);
   const base = json?.result?.response?.ResponseBase;
   if (!base) throw new ReadError("network", "The node sent an unexpected response. Try again in a moment.");
   const err = base.Error;
+  let decoded = "";
+  if (base.Data) {
+    if (typeof base.Data !== "string")
+      throw new ReadError("network", "The node sent an unexpected response. Try again in a moment.");
+    try {
+      decoded = b64decode(base.Data);
+    } catch {
+      throw new ReadError("network", "The node sent an unexpected response. Try again in a moment.");
+    }
+  }
   return {
-    data: base.Data ? b64decode(base.Data) : "",
+    data: decoded,
     error: err ? String(err.value ?? err["@type"] ?? "error") : null,
     log: typeof base.Log === "string" ? base.Log : "",
   };
@@ -153,13 +198,16 @@ export const read = {
   quests: (ids: bigint[]): Promise<Quest[]> => Promise.all(ids.map((id) => read.quest(id))),
   height: (): Promise<bigint> =>
     cached("height", async () => {
-      let res: Response;
-      try {
-        res = await fetch(config.rpcUrl.replace(/\/$/, "") + "/status");
-      } catch {
-        throw new ReadError("network", `Could not reach the ${config.networkName} node at ${config.rpcUrl}.`);
-      }
-      const j = await res.json().catch(() => null);
+      const j = await withTimeout(async (signal) => {
+        let res: Response;
+        try {
+          res = await fetch(config.rpcUrl.replace(/\/$/, "") + "/status", { signal });
+        } catch {
+          throw new ReadError("network", `Could not reach the ${config.networkName} node at ${config.rpcUrl}.`);
+        }
+        checkHttpStatus(res);
+        return await res.json().catch(() => null);
+      });
       const h = j?.result?.sync_info?.latest_block_height;
       if (typeof h !== "string" || !/^\d+$/.test(h)) throw new ReadError("network", "The node did not report its block height.");
       return BigInt(h);
