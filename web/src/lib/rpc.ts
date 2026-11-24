@@ -99,7 +99,7 @@ export async function abciQuery(path: string, data: string, fetchFn: typeof fetc
     throw new ReadError("network", "The node sent an unexpected response. Try again in a moment.");
   if (json.error) throw new ReadError("network", `The node returned an error: ${String(json.error.message ?? json.error.data ?? "unknown")}`);
   const base = json?.result?.response?.ResponseBase;
-  if (!base) throw new ReadError("network", "The node sent an unexpected response. Try again in a moment.");
+  if (!base || typeof base !== "object") throw new ReadError("network", "The node sent an unexpected response. Try again in a moment.");
   const err = base.Error;
   let decoded = "";
   if (base.Data) {
@@ -167,7 +167,10 @@ function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
   if (hit && now - hit.at < TTL_MS) return hit.value as Promise<T>;
   const value = load();
   cache.set(key, { at: now, value });
-  value.catch(() => cache.delete(key)); // never cache failures
+  // Never cache failures. Only drop this read's own entry: a slow failure must not evict a newer read.
+  value.catch(() => {
+    if (cache.get(key)?.value === value) cache.delete(key);
+  });
   return value;
 }
 

@@ -188,6 +188,8 @@ describe("abciQuery", () => {
       ["a JSON boolean", true],
       ["a JSON array", []],
       ["a JSON string", "hello"],
+      ["ResponseBase a number", { result: { response: { ResponseBase: 5 } } }],
+      ["ResponseBase a string", { result: { response: { ResponseBase: "x" } } }],
     ])("%s", async (_name, body) => {
       const e = await readError(abciQuery("p", "d", fakeFetch(httpReply(200, body)).fn));
       expect(e.kind).toBe("network");
@@ -196,6 +198,13 @@ describe("abciQuery", () => {
 
     it("invalid base64 in ResponseBase.Data becomes ReadError('network')", async () => {
       const e = await readError(abciQuery("p", "d", fakeFetch(abciReply({ Data: "%%%" })).fn));
+      expect(e.kind).toBe("network");
+      expect(e.message).toBe("The node sent an unexpected response. Try again in a moment.");
+    });
+
+    it("ResponseBase.Data that is not a string becomes ReadError('network')", async () => {
+      // 123 would pass atob() and come back as garbage text, so it must be refused before decoding.
+      const e = await readError(abciQuery("p", "d", fakeFetch(abciReply({ Data: 123 as unknown as string })).fn));
       expect(e.kind).toBe("network");
       expect(e.message).toBe("The node sent an unexpected response. Try again in a moment.");
     });
@@ -578,6 +587,18 @@ describe("read (realm reads through vm/qeval_json)", () => {
       await expect(read.totals()).resolves.toEqual(decodeTotals(R["GetTotals()"].data));
       expect(f.calls()).toBe(2);
       expect(vi.getTimerCount()).toBe(0);
+    });
+    it("a slow failure does not evict a newer cached read", async () => {
+      vi.useFakeTimers();
+      const f = useFetch(() => new Promise<Response>(() => {}), fixtureReply("GetTotals()"));
+      const slow = readError(read.totals()); // hangs; times out at 12 s
+      await vi.advanceTimersByTimeAsync(9_000); // its cache entry (4 s) has expired
+      await read.totals(); // a newer read succeeds and is cached
+      expect(f.calls()).toBe(2);
+      await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS - 9_000);
+      expect((await slow).message).toBe(`The ${config.networkName} node at ${config.rpcUrl} did not answer in time. Try again in a moment.`);
+      await read.totals(); // 3 s after the newer read: still served from the cache
+      expect(f.calls()).toBe(2);
     });
   });
 
