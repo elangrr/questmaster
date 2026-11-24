@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { config, gnowebPage } from "../config";
 import { Icon } from "./icons";
 import { shortAddr } from "../lib/format";
@@ -117,6 +117,67 @@ function ThemeToggle() {
   );
 }
 
+function TopNav() {
+  const route = useRoute();
+  const scroller = useRef<HTMLDivElement>(null);
+  const [fade, setFade] = useState({ left: false, right: false });
+
+  const measure = useCallback(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const left = el.scrollLeft > 1;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setFade((prev) => (prev.left === left && prev.right === right ? prev : { left, right }));
+  }, []);
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    measure();
+    window.addEventListener("resize", measure);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    return () => {
+      window.removeEventListener("resize", measure);
+      ro?.disconnect();
+    };
+  }, [measure]);
+
+  // Keep the active link visible horizontally in the narrow nav strip without scrolling the page.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const active = el.querySelector<HTMLElement>(".nav-link.active");
+    if (el.scrollWidth > el.clientWidth) {
+      if (active) {
+        const box = el.getBoundingClientRect();
+        const item = active.getBoundingClientRect();
+        const pad = 24;
+        if (item.right > box.right - pad) el.scrollLeft += item.right - (box.right - pad);
+        else if (item.left < box.left + pad) el.scrollLeft -= box.left + pad - item.left;
+      } else {
+        el.scrollLeft = 0;
+      }
+    }
+    measure();
+  }, [route, measure]);
+
+  return (
+    <div className="top-nav-wrap" data-fade-left={fade.left ? "1" : undefined} data-fade-right={fade.right ? "1" : undefined}>
+      <div className="top-nav" ref={scroller} onScroll={measure}>
+        <nav className="nav" aria-label="Main">
+          <NavLink to="/">Board</NavLink>
+          <NavLink to="/paid">Paid</NavLink>
+          <NavLink to="/mine">My quests</NavLink>
+          <NavLink to="/post">Post</NavLink>
+          <NavLink to="/how">How it works</NavLink>
+          <NavLink to="/agents">AI agents</NavLink>
+        </nav>
+      </div>
+    </div>
+  );
+}
+
 function Shell() {
   const w = useWallet();
   return (
@@ -144,18 +205,9 @@ function Shell() {
             </span>
           </div>
           {/* Wide screens: one row. Narrower: testnet tag on top, brand + actions,
-              then one scrollable row of links starting at Board so primary routes
-              stay visible without scrolling. */}
-          <div className="top-nav">
-            <nav className="nav" aria-label="Main">
-              <NavLink to="/">Board</NavLink>
-              <NavLink to="/paid">Paid</NavLink>
-              <NavLink to="/mine">My quests</NavLink>
-              <NavLink to="/post">Post</NavLink>
-              <NavLink to="/how">How it works</NavLink>
-              <NavLink to="/agents">AI agents</NavLink>
-            </nav>
-          </div>
+              then one scrollable row of links starting at Board with edge fades
+              when more links continue off-screen. */}
+          <TopNav />
           <div className="top-actions">
             <ThemeToggle />
             <WalletButton />

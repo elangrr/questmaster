@@ -232,14 +232,19 @@ export function AddressPage({ address, query }: { address: string; query: URLSea
   return (
     <section>
       <h1>Quests of an address</h1>
-      <AddressSearch initial={address} />
       {!valid ? (
-        <Empty>That is not a valid g1 address.</Empty>
+        <>
+          <AddressSearch key={address} initial={address} />
+          <Empty>That is not a valid g1 address.</Empty>
+        </>
       ) : (
         <>
-          <div className="addr-bar">
-            <span className="mono wrap">{address}</span>
-            <CopyButton text={address} label="Copy address" name="address" />
+          <div className="addr-tools">
+            <div className="addr-bar">
+              <span className="mono wrap">{address}</span>
+              <CopyButton text={address} label="Copy address" name="address" />
+            </div>
+            <AddressSearch key={address} placeholder="Look up another g1… address" />
           </div>
           <RecordPanel address={address} />
           <h2>Quests</h2>
@@ -272,7 +277,7 @@ export function AddressPage({ address, query }: { address: string; query: URLSea
   );
 }
 
-export function AddressSearch({ initial = "" }: { initial?: string }) {
+export function AddressSearch({ initial = "", placeholder = "g1… address" }: { initial?: string; placeholder?: string }) {
   const [v, setV] = useState(initial);
   return (
     <form
@@ -285,7 +290,7 @@ export function AddressSearch({ initial = "" }: { initial?: string }) {
       <label htmlFor="addr-search" className="sr-only">
         Address
       </label>
-      <input id="addr-search" className="input mono" placeholder="g1… address" value={v} onChange={(e) => setV(e.target.value)} spellCheck={false} autoComplete="off" />
+      <input id="addr-search" className="input mono" placeholder={placeholder} value={v} onChange={(e) => setV(e.target.value)} spellCheck={false} autoComplete="off" />
       <button className="btn" type="submit">
         Show quests
       </button>
@@ -571,7 +576,7 @@ function ActionItem({
       <div className="action-row">
         <div>
           <div className="action-title">
-            <strong>{o.label}</strong> <span className="muted small">· {o.who}</span>
+            <strong>{o.label}</strong> <span className="muted small">{o.who}</span>
           </div>
           <p className="action-explain">{o.explain}</p>
           {o.blocked && !notConnected && <p className="action-blocked small">{o.blocked}</p>}

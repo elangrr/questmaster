@@ -180,7 +180,7 @@ function PosterFacts({ r }: { r: PosterRecord }) {
     <>
       <p className="rec-headline">{posterHeadline(r)}</p>
       {sig && <p className={`rec-note ${sig.kind}`}>{sig.text}</p>}
-      <dl className="rec-stats">
+      <dl className="rec-stats rec-stats-6">
         <Stat n={r.total} label="Posted" />
         <Stat n={r.paid} label="Paid" tone={r.paid > 0 ? "good" : undefined} />
         <Stat n={r.open + r.inProgress} label="Open or in progress" />
@@ -202,7 +202,7 @@ function BuilderFacts({ r }: { r: BuilderRecord }) {
   return (
     <>
       <p className="rec-headline">{builderHeadline(r)}</p>
-      <dl className="rec-stats">
+      <dl className="rec-stats rec-stats-4">
         <Stat n={r.total} label="Taken" />
         <Stat n={r.paid} label="Paid" tone={r.paid > 0 ? "good" : undefined} />
         <Stat n={r.inProgress} label="In progress" />

@@ -642,6 +642,183 @@ for (const width of [768, 1024, 1280]) {
   });
 }
 
+test("design: hero diagram labels stay clear of branches and numbers keep AA contrast", async ({ browser }) => {
+  for (const scheme of ["light", "dark"] as const) {
+    for (const width of [768, 1024, 1280]) {
+      const ctx = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: scheme });
+      await mockPrice(ctx);
+      const page = await ctx.newPage();
+      await page.goto(`${APP}#/`);
+      await page.locator("[data-testid=quest-flow]").waitFor();
+      const issues = await page.evaluate(() => {
+        const out: string[] = [];
+        const svg = document.querySelector<SVGSVGElement>("svg.flow-svg")!;
+        const branches = Array.from(svg.querySelectorAll<SVGPathElement>(".flow-branch"));
+        const labels = Array.from(svg.querySelectorAll<SVGTextElement>(".flow-label, .flow-sub"));
+        const exits = Array.from(svg.querySelectorAll<SVGRectElement>(".flow-exit rect"));
+        const overlap = (a: DOMRect, b: DOMRect, pad = 0) =>
+          a.left + pad < b.right && a.right - pad > b.left && a.top + pad < b.bottom && a.bottom - pad > b.top;
+        for (const br of branches) {
+          const r = br.getBoundingClientRect();
+          for (const lbl of labels) {
+            if (overlap(r, lbl.getBoundingClientRect())) out.push(`branch overlaps label "${lbl.textContent}"`);
+          }
+          for (const ex of exits) {
+            // Branches may touch the outer edge of an exit box, never cut through its interior.
+            if (overlap(r, ex.getBoundingClientRect(), 3)) out.push(`branch cuts through exit box`);
+          }
+        }
+        const rgb = (s: string) => {
+          const m = s.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+          return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+        };
+        const lum = ([r, g, b]: number[]) => {
+          const c = [r, g, b].map((v) => {
+            const n = v / 255;
+            return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4);
+          });
+          return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+        };
+        const ratio = (a: number[], b: number[]) => {
+          const [l1, l2] = [lum(a), lum(b)].sort((x, y) => y - x);
+          return (l1 + 0.05) / (l2 + 0.05);
+        };
+        const nodes = Array.from(svg.querySelectorAll<SVGGElement>(".flow-node"));
+        const anims = svg.getAnimations();
+        for (const t of [0, 200, 600, 1200, 2000, 2500, 4200, 6200, 9400]) {
+          for (const a of anims) {
+            a.pause();
+            a.currentTime = t;
+          }
+          for (const n of nodes) {
+            const bg = rgb(getComputedStyle(n.querySelector(".flow-circle")!).fill);
+            const fg = rgb(getComputedStyle(n.querySelector(".flow-num")!).fill);
+            if (!bg || !fg) {
+              out.push(`unparsed fill at ${t}ms`);
+              continue;
+            }
+            const cr = ratio(fg, bg);
+            if (cr < 4.5) out.push(`step ${n.querySelector(".flow-num")?.textContent} contrast ${cr.toFixed(2)} at ${t}ms`);
+          }
+        }
+        return out;
+      });
+      await ctx.close();
+      expect(issues, `${scheme} ${width}px`).toEqual([]);
+    }
+    // Also check settled reduced-motion state in both themes.
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: scheme, reducedMotion: "reduce" });
+    await mockPrice(ctx);
+    const page = await ctx.newPage();
+    await page.goto(`${APP}#/`);
+    await page.locator("[data-testid=quest-flow]").waitFor();
+    const minContrast = await page.evaluate(() => {
+      const rgb = (s: string) => s.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)!.slice(1).map(Number);
+      const lum = ([r, g, b]: number[]) => {
+        const c = [r, g, b].map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : Math.pow((v / 255 + 0.055) / 1.055, 2.4)));
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+      };
+      return Math.min(
+        ...Array.from(document.querySelectorAll<SVGGElement>(".flow-node")).map((n) => {
+          const [l1, l2] = [lum(rgb(getComputedStyle(n.querySelector(".flow-num")!).fill)), lum(rgb(getComputedStyle(n.querySelector(".flow-circle")!).fill))].sort((a, b) => b - a);
+          return (l1 + 0.05) / (l2 + 0.05);
+        }),
+      );
+    });
+    await ctx.close();
+    expect(minContrast, `${scheme} reduced motion`).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
+test("design: address page shows address once and leaves no orphan record stats", async ({ browser }) => {
+  for (const width of [1280, 1024, 768, 390]) {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: "reduce" });
+    await mockPrice(ctx);
+    const page = await ctx.newPage();
+    for (const addr of [OTHER, BUILDER]) {
+      await page.goto(`${APP}#/address/${addr}`);
+      await page.locator('[data-record-card="builder"] .rec-stat').first().waitFor();
+      await expect(page.locator(".addr-bar")).toContainText(addr);
+      await expect(page.locator("#addr-search")).toHaveValue("");
+      const problems = await page.evaluate(() => {
+        const out: string[] = [];
+        for (const card of Array.from(document.querySelectorAll<HTMLElement>("[data-record-card]"))) {
+          const role = card.getAttribute("data-record-card");
+          const stats = Array.from(card.querySelectorAll<HTMLElement>(".rec-stat"));
+          const rows = new Map<number, HTMLElement[]>();
+          for (const s of stats) {
+            const top = Math.round(s.getBoundingClientRect().top);
+            const bucket = [...rows.keys()].find((k) => Math.abs(k - top) <= 2) ?? top;
+            rows.set(bucket, [...(rows.get(bucket) ?? []), s]);
+          }
+          for (const [top, items] of rows) {
+            if (items.length === 1) out.push(`${role}: orphan stat at y=${top} ("${items[0].querySelector("dt")?.textContent}")`);
+            const bottoms = items.map((i) => i.querySelector("dd")!.getBoundingClientRect().bottom);
+            if (Math.max(...bottoms) - Math.min(...bottoms) > 1.5) out.push(`${role}: stat numbers misaligned at y=${top}`);
+          }
+        }
+        return out;
+      });
+      expect(problems, `${addr} at ${width}px`).toEqual([]);
+    }
+    await ctx.close();
+  }
+});
+
+test("design: How it works and AI agents keep one column width", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: "reduce" });
+  await mockPrice(ctx);
+  const page = await ctx.newPage();
+  for (const [route, sel] of [
+    ["/how", ".prose, .step-card, .rule-cards"],
+    ["/agents", ".prose, .code-card, .prompt"],
+  ] as const) {
+    await page.goto(`${APP}#${route}`);
+    await page.locator("main h1").waitFor();
+    const diff = await page.evaluate((sel) => {
+      const col = document.querySelector<HTMLElement>("section.narrow")!.getBoundingClientRect();
+      return Array.from(document.querySelectorAll<HTMLElement>(sel))
+        .map((el) => Math.abs(el.getBoundingClientRect().right - col.right))
+        .filter((d) => d > 2);
+    }, sel);
+    expect(diff, `${route} right edges`).toEqual([]);
+  }
+  await ctx.close();
+});
+
+test("design: phone header nav cues overflow and keeps 44 px links", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" });
+  await mockPrice(ctx);
+  const page = await ctx.newPage();
+  await page.goto(`${APP}#/`);
+  await page.locator("header .nav-link").first().waitFor();
+  const wrap = page.locator(".top-nav-wrap");
+  await expect(wrap).toHaveAttribute("data-fade-right", "1");
+  await expect(wrap).not.toHaveAttribute("data-fade-left", "1");
+  const minLinkH = await page.evaluate(() => Math.min(...Array.from(document.querySelectorAll<HTMLElement>("header .nav-link")).map((a) => a.getBoundingClientRect().height)));
+  expect(minLinkH).toBeGreaterThanOrEqual(44);
+  await page.locator(".top-nav").evaluate((el) => {
+    el.scrollLeft = el.scrollWidth;
+  });
+  await expect(wrap).toHaveAttribute("data-fade-left", "1");
+  await expect(wrap).not.toHaveAttribute("data-fade-right", "1");
+  // Visiting a route without an active top-nav link resets scroll back to Board.
+  await page.goto(`${APP}#/address/${OTHER}`);
+  await page.locator("main h1").waitFor();
+  await expect(wrap).toHaveAttribute("data-fade-right", "1");
+  await expect(wrap).not.toHaveAttribute("data-fade-left", "1");
+  await ctx.close();
+  // At tablet width (1024 px), all links fit so neither edge fade is shown.
+  const tabCtx = await browser.newContext({ viewport: { width: 1024, height: 900 }, reducedMotion: "reduce" });
+  await mockPrice(tabCtx);
+  const tabPage = await tabCtx.newPage();
+  await tabPage.goto(`${APP}#/`);
+  await tabPage.locator("header .nav-link").first().waitFor();
+  await expect(tabPage.locator(".top-nav-wrap")).not.toHaveAttribute("data-fade-right", "1");
+  await expect(tabPage.locator(".top-nav-wrap")).not.toHaveAttribute("data-fade-left", "1");
+  await tabCtx.close();
+});
+
 test("design: the quest page is not a stack of bordered cards", async ({ page }) => {
   await open(page, "/quest/4");
   await page.locator("main h1").waitFor();
@@ -862,4 +1039,21 @@ for (const scheme of ["light", "dark"] as const) {
       await ctx.close();
     });
   }
+  test(`screenshots tablet ${scheme}`, async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 900 }, colorScheme: scheme });
+    await mockPrice(ctx);
+    const page = await ctx.newPage();
+    for (const [route, file] of [
+      ["/", "board"],
+      ["/quest/4", "quest-submitted"],
+      [`/address/${OTHER}`, "address-record"],
+    ] as const) {
+      await page.goto(`${APP}#${route}`);
+      await page.locator("main h1").first().waitFor();
+      await page.waitForLoadState("networkidle");
+      await page.waitForTimeout(1000);
+      await page.screenshot({ path: `${SHOTS}/${file}-tablet-${scheme}.png`, fullPage: true });
+    }
+    await ctx.close();
+  });
 }

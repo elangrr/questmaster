@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <style>
     .bg{fill:#1a4fd6}.fg{stroke:#ffffff}.dot{fill:#f5b749}
-    @media (prefers-color-scheme:dark){.bg{fill:#6095ff}.fg{stroke:#071124}.dot{fill:#071124}}
+    @media (prefers-color-scheme:dark){.bg{fill:#6ea2ff}.fg{stroke:#071124}.dot{fill:#071124}}
   </style>
   <rect class="bg" x="1" y="1" width="30" height="30" rx="8"/>
   <rect class="fg" x="7.5" y="12.5" width="17" height="12.5" rx="2.5" fill="none" stroke-width="2.1"/>

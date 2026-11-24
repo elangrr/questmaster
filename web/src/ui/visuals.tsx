@@ -62,29 +62,31 @@ export function QuestFlow() {
           Post, take, submit, approve, paid. Two side exits: a closed quest refunds the poster; a submission left unanswered for about 7 days is paid
           out to the builder.
         </desc>
-        <path className="flow-line" d="M56 90H560" />
-        <path className="flow-line flow-progress" d="M56 90H560" pathLength={100} />
-        {/* side exits */}
-        <path className="flow-branch" d="M182 110v52q0 14 14 14h38" />
-        <path className="flow-branch timeout" d="M308 110v52q0 14 14 14h224q14 0 14-14V110" />
-        <g className="flow-exit" transform="translate(234 176)">
-          <rect x="0" y="-17" width="152" height="34" rx="8" />
-          <text x="76" y="5" textAnchor="middle">Closed · refunded</text>
+        <path className="flow-line" d="M56 92H560" />
+        <path className="flow-line flow-progress" d="M56 92H560" pathLength={100} />
+        {/* side exits: start cleanly below the step sub-labels so no line crosses text */}
+        <path className="flow-branch" d="M182 146V177" />
+        <path className="flow-branch timeout" d="M308 146v34q0 14 14 14h34" />
+        <path className="flow-branch timeout" d="M512 194h34q14 0 14-14v-34" />
+        <g className="flow-exit" transform="translate(104 194)">
+          <rect x="0" y="-17" width="156" height="34" rx="8" />
+          <text x="78" y="5" textAnchor="middle">Closed · refunded</text>
         </g>
-        <g className="flow-exit timeout" transform="translate(398 176)">
-          <rect x="0" y="-17" width="152" height="34" rx="8" />
-          <text x="76" y="5" textAnchor="middle">7 days · auto-pay</text>
+        <g className="flow-exit timeout" transform="translate(356 194)">
+          <rect x="0" y="-17" width="156" height="34" rx="8" />
+          <text x="78" y="5" textAnchor="middle">7 days · auto-pay</text>
         </g>
         {FLOW.map((n, i) => (
-          <g key={n.label} className="flow-node" style={{ ["--i" as string]: i }} transform={`translate(${n.x} 90)`}>
-            <circle r="18" />
+          <g key={n.label} className="flow-node" style={{ ["--i" as string]: i }} transform={`translate(${n.x} 92)`}>
+            <circle className="flow-ring" r="23" />
+            <circle className="flow-circle" r="18" />
             <text className="flow-num" y="5" textAnchor="middle">
               {i + 1}
             </text>
             <text className="flow-label" y="-32" textAnchor="middle">
               {n.label}
             </text>
-            <text className="flow-sub" y="42" textAnchor="middle">
+            <text className="flow-sub" y="38" textAnchor="middle">
               {n.sub}
             </text>
           </g>
