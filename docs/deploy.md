@@ -120,7 +120,7 @@ when it is enabled; if links showed an empty path, stop and report it.)
 **2026-11-24: the realm is live.** It was submitted at block 1,347,486 (08:39 UTC on 2026-11-23) and enabled after
 about 32 hours in the review queue: the status page shows "passed", with a verdict time of 16:58 UTC on 2026-11-24.
 Read-only checks at about 20:16 UTC that day, all as expected: `vm/qpkgmeta_json` returns `"status":"live"` (height
-1347486); `GetTotals()` is all zeros and `OpenQuestIDs(0, 5)` is empty, since no quest has been posted; the rendered
+1347486); `GetTotals()` is all zeros and `OpenQuestIDs(0, 5)` is empty, since no quest had been posted yet; the rendered
 home, help and paid pages are correct, and the nine commands on the help page carry the realm's own `-pkgpath`;
 `vm/qstorage` returns 77,696 bytes and a 7,769,600 ugnot deposit, the same as measured locally.
 

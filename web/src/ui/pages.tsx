@@ -1172,8 +1172,8 @@ export function Agents() {
           it could also take and submit quests, signing like any wallet.
         </p>
         <p className="muted small">
-          Verified for this guide: reads only (render and eval), on Onyx on 24 November 2026 and on a local test chain. The realm is live on Onyx,
-          but no quest had been posted there yet, so reads of a quest were checked on the local chain. No write was run.
+          Verified for this guide: reads only (render and eval), on Onyx on 24 and 26 November 2026 and on a local test chain. On 26 November the reads
+          of the board and of single quests returned the real quests posted on Onyx. No write was run.
         </p>
       </div>
 
